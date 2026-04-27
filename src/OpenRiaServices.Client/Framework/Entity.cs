@@ -1773,6 +1773,31 @@ namespace OpenRiaServices.Client
         }
 
         /// <summary>
+        /// Method called when this entity is being serialized (e.g., when submitting changes to the server).
+        /// Override this method to perform custom logic before serialization, such as clearing sensitive data
+        /// or preparing data for network transmission.
+        /// </summary>
+        /// <remarks>
+        /// This method is automatically invoked by the serializer before the entity is serialized for network transmission.
+        /// It provides an extension point for developers to implement custom serialization-time logic.
+        /// </remarks>
+        protected virtual void OnSerializing()
+        {
+        }
+
+        /// <summary>
+        /// Method called by the serializer when this entity is being serialized.
+        /// This method invokes the protected <see cref="OnSerializing()"/> virtual method.
+        /// </summary>
+        /// <param name="context">The serialization context</param>
+        [OnSerializing]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public void OnSerializing(StreamingContext context)
+        {
+            this.OnSerializing();
+        }
+
+        /// <summary>
         /// Recursively verifies that this instance nor any of its child instances are
         /// currently in an edit session. This check differs from IsEditing in that it
         /// is recursive through child complex objects.
