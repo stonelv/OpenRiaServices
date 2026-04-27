@@ -1207,6 +1207,74 @@ namespace OpenRiaServices.Client.Test
 
             Assert.IsTrue(entity.OnSerializingCalled);
         }
+
+        [TestMethod]
+        [TestDescription("Verifies that OnSerializing is called in correct inheritance chain order (base to derived when using base.OnSerializing())")]
+        public void Entity_OnSerializing_InheritanceChain_CalledInCorrectOrder()
+        {
+            var entityC = new InheritanceTestEntityC
+            {
+                Id = 1,
+                ValueA = "A",
+                ValueB = "B",
+                ValueC = "C"
+            };
+
+            Assert.IsFalse(entityC.OnSerializingACalled, "EntityA.OnSerializing should not have been called yet");
+            Assert.IsFalse(entityC.OnSerializingBCalled, "EntityB.OnSerializing should not have been called yet");
+            Assert.IsFalse(entityC.OnSerializingCCalled, "EntityC.OnSerializing should not have been called yet");
+
+            var serializer = new System.Runtime.Serialization.DataContractSerializer(typeof(InheritanceTestEntityC));
+            using (var stream = new System.IO.MemoryStream())
+            {
+                serializer.WriteObject(stream, entityC);
+            }
+
+            Assert.IsTrue(entityC.OnSerializingACalled, "EntityA.OnSerializing should have been called");
+            Assert.IsTrue(entityC.OnSerializingBCalled, "EntityB.OnSerializing should have been called");
+            Assert.IsTrue(entityC.OnSerializingCCalled, "EntityC.OnSerializing should have been called");
+
+            var expectedOrder = new List<string> { "C", "B", "A" };
+            CollectionAssert.AreEqual(expectedOrder, entityC.CallOrder,
+                "OnSerializing should be called from most derived to base: C → B → A");
+
+            Assert.AreEqual("A_Cleared", entityC.ValueA, "EntityA.OnSerializing should have cleared ValueA");
+            Assert.AreEqual("B_Cleared", entityC.ValueB, "EntityB.OnSerializing should have cleared ValueB");
+            Assert.AreEqual("C_Cleared", entityC.ValueC, "EntityC.OnSerializing should have cleared ValueC");
+        }
+
+        [TestMethod]
+        [TestDescription("Verifies that OnSerializing is NOT called during normal entity operations that don't involve serialization")]
+        public void Entity_OnSerializing_NotCalledDuringNormalEntityOperations()
+        {
+            var entity = new OnSerializingTestEntity
+            {
+                Id = 1,
+                SensitiveData = "sensitive data"
+            };
+
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not be called initially");
+
+            entity.Id = 2;
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not be called after property change");
+
+            var container = new ConfigurableEntityContainer();
+            container.CreateSet<OnSerializingTestEntity>(EntitySetOperations.All);
+            var set = container.GetEntitySet<OnSerializingTestEntity>();
+
+            set.Add(entity);
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not be called after adding to EntitySet");
+
+            entity.SensitiveData = "modified";
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not be called after modification in EntitySet");
+
+            ((IEditableObject)entity).BeginEdit();
+            entity.Id = 3;
+            ((IEditableObject)entity).EndEdit();
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not be called during edit operations");
+
+            Assert.AreEqual("modified", entity.SensitiveData, "SensitiveData should still have its value since OnSerializing was not called");
+        }
     }
 
     [DataContract]
@@ -1227,6 +1295,66 @@ namespace OpenRiaServices.Client.Test
             OnSerializingCalled = true;
             OnSerializingCallCount++;
             SensitiveData = null;
+            base.OnSerializing();
+        }
+    }
+
+    [DataContract]
+    [KnownType(typeof(InheritanceTestEntityB))]
+    public class InheritanceTestEntityA : Entity
+    {
+        [Key]
+        [DataMember]
+        public int Id { get; set; }
+
+        [DataMember]
+        public string? ValueA { get; set; }
+
+        public bool OnSerializingACalled { get; private set; }
+
+        protected List<string> _callOrder = new List<string>();
+        public IReadOnlyList<string> CallOrder => _callOrder.AsReadOnly();
+
+        protected override void OnSerializing()
+        {
+            OnSerializingACalled = true;
+            _callOrder.Add("A");
+            ValueA = "A_Cleared";
+            base.OnSerializing();
+        }
+    }
+
+    [DataContract]
+    [KnownType(typeof(InheritanceTestEntityC))]
+    public class InheritanceTestEntityB : InheritanceTestEntityA
+    {
+        [DataMember]
+        public string? ValueB { get; set; }
+
+        public bool OnSerializingBCalled { get; private set; }
+
+        protected override void OnSerializing()
+        {
+            OnSerializingBCalled = true;
+            _callOrder.Add("B");
+            ValueB = "B_Cleared";
+            base.OnSerializing();
+        }
+    }
+
+    [DataContract]
+    public class InheritanceTestEntityC : InheritanceTestEntityB
+    {
+        [DataMember]
+        public string? ValueC { get; set; }
+
+        public bool OnSerializingCCalled { get; private set; }
+
+        protected override void OnSerializing()
+        {
+            OnSerializingCCalled = true;
+            _callOrder.Add("C");
+            ValueC = "C_Cleared";
             base.OnSerializing();
         }
     }
