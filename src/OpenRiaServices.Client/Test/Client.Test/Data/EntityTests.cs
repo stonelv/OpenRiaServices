@@ -1166,4 +1166,68 @@ namespace OpenRiaServices.Client.Test
             }
         }
     }
+
+    [TestClass]
+    public class EntitySerializingTests : UnitTestBase
+    {
+        [TestMethod]
+        [TestDescription("Verifies that OnSerializing() virtual method is called when entity is serialized")]
+        public void Entity_OnSerializing_CalledDuringSerialization()
+        {
+            var entity = new OnSerializingTestEntity
+            {
+                Id = 1,
+                SensitiveData = "This should be cleared during serialization"
+            };
+
+            Assert.IsFalse(entity.OnSerializingCalled, "OnSerializing should not have been called yet");
+
+            var serializer = new System.Runtime.Serialization.DataContractSerializer(typeof(OnSerializingTestEntity));
+            using (var stream = new System.IO.MemoryStream())
+            {
+                serializer.WriteObject(stream, entity);
+            }
+
+            Assert.IsTrue(entity.OnSerializingCalled, "OnSerializing should have been called during serialization");
+            Assert.IsNull(entity.SensitiveData, "Sensitive data should have been cleared in OnSerializing");
+            Assert.AreEqual(1, entity.OnSerializingCallCount, "OnSerializing should have been called exactly once");
+        }
+
+        [TestMethod]
+        [TestDescription("Verifies that the base Entity OnSerializing method can be called without errors")]
+        public void Entity_OnSerializing_CanBeCalledDirectly()
+        {
+            var entity = new OnSerializingTestEntity
+            {
+                Id = 1,
+                SensitiveData = "test"
+            };
+
+            entity.OnSerializing(new System.Runtime.Serialization.StreamingContext());
+
+            Assert.IsTrue(entity.OnSerializingCalled);
+        }
+    }
+
+    [DataContract]
+    public class OnSerializingTestEntity : Entity
+    {
+        [Key]
+        [DataMember]
+        public int Id { get; set; }
+
+        [DataMember]
+        public string? SensitiveData { get; set; }
+
+        public bool OnSerializingCalled { get; private set; }
+        public int OnSerializingCallCount { get; private set; }
+
+        protected override void OnSerializing()
+        {
+            OnSerializingCalled = true;
+            OnSerializingCallCount++;
+            SensitiveData = null;
+            base.OnSerializing();
+        }
+    }
 }
