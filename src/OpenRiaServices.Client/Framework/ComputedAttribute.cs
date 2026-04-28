@@ -1,18 +1,19 @@
 using System;
-using System.Runtime.Serialization;
 
 namespace OpenRiaServices.Client
 {
     /// <summary>
-    /// 标记一个属性为计算属性。计算属性仅用于客户端计算展示，
-    /// 自动排除出变更追踪和序列化，不会提交到服务端。
+    /// Attribute used to indicate that a property is a computed property. 
+    /// Computed properties are used for client-side calculation and display only.
+    /// They are automatically excluded from change tracking, serialization, 
+    /// and will not be submitted to the server.
     /// </summary>
     /// <remarks>
-    /// 应用此特性的属性将具有以下行为：
-    /// 1. 不会被包含在变更追踪中
-    /// 2. 不会被序列化到服务端
-    /// 3. 不会被提交到服务端
-    /// 4. 仅用于客户端的计算和展示目的
+    /// Properties marked with this attribute will have the following behaviors:
+    /// 1. Not included in change tracking
+    /// 2. Not serialized to the server
+    /// 3. Not submitted to the server
+    /// 4. Used only for client-side calculation and display purposes
     /// </remarks>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class ComputedAttribute : Attribute
