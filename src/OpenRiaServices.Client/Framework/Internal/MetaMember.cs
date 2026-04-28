@@ -32,7 +32,8 @@ namespace OpenRiaServices.Client.Internal
             if (hasGetter && (property.GetSetMethod() != null))
             {
                 IsDataMember = (IsComplex || TypeUtility.IsPredefinedType(property.PropertyType))
-                        && !TypeUtility.IsAttributeDefined(property, typeof(IgnoreDataMemberAttribute), false);
+                        && !TypeUtility.IsAttributeDefined(property, typeof(IgnoreDataMemberAttribute), false)
+                        && !TypeUtility.IsAttributeDefined(property, typeof(ComputedAttribute), false);
             }
 
             if (hasGetter)
