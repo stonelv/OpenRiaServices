@@ -17,7 +17,7 @@ namespace OpenRiaServices.Server
     /// </remarks>
     /// </summary>
     [DebuggerDisplay("Type = {_type.Name}")]
-    internal sealed class MetaType
+    public sealed class MetaType
     {
         private static readonly ConcurrentDictionary<Type, MetaType> s_metaTypes = new ConcurrentDictionary<Type, MetaType>();
         private static readonly Func<Type, MetaType> s_createMetaType = (t) => new MetaType(t);
@@ -273,7 +273,7 @@ namespace OpenRiaServices.Server
     /// This class caches all the interesting attributes of an property.
     /// </summary>
     [DebuggerDisplay("Name = {Member.Name}")]
-    internal sealed class MetaMember
+    public sealed class MetaMember
     {
         public MetaMember(MetaType metaType, PropertyDescriptor property)
         {
