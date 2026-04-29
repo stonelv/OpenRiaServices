@@ -14,6 +14,7 @@ namespace OpenRiaServices.Client.Web.Internal
     sealed class WcfQueryHeaderInspector : IClientMessageInspector
     {
         private const string IncludeTotalCountPropertyName = "DomainServiceIncludeTotalCount";
+        private const string IncludeDeletedPropertyName = "DomainServiceIncludeDeleted";
         private const string QueryPropertyName = "DomainServiceQuery";
 
         public WcfQueryHeaderInspector()
@@ -28,14 +29,16 @@ namespace OpenRiaServices.Client.Web.Internal
             {
                 messageProperties.TryGetValue(QueryPropertyName, out object queryProperty);
                 messageProperties.TryGetValue(IncludeTotalCountPropertyName, out object includeTotalCountProperty);
+                messageProperties.TryGetValue(IncludeDeletedPropertyName, out object includeDeletedProperty);
 
                 // Add Query Options header if any options were specified
-                if (queryProperty != null || includeTotalCountProperty != null)
+                if (queryProperty != null || includeTotalCountProperty != null || includeDeletedProperty != null)
                 {
                     var queryParts = queryProperty != null ? QuerySerializer.Serialize((IQueryable)queryProperty) : null;
                     var includeTotalCount = (bool?)includeTotalCountProperty;
+                    var includeDeleted = (bool?)includeDeletedProperty;
 
-                    var header = new QueryOptionsHeader(queryParts, includeTotalCount == true);
+                    var header = new QueryOptionsHeader(queryParts, includeTotalCount == true, includeDeleted == true);
                     request.Headers.Add(header);
                 }
             }
@@ -57,16 +60,19 @@ namespace OpenRiaServices.Client.Web.Internal
             private const string QueryNameAttribute = "Name";
             private const string QueryValueAttribute = "Value";
             private const string QueryIncludeTotalCountOption = "includeTotalCount";
+            private const string QueryIncludeDeletedOption = "includeDeleted";
             private const string QueryHeaderName = "DomainServiceQuery";
             private const string QueryHeaderNamespace = "DomainServices";
 
             private readonly IEnumerable<ServiceQueryPart> _queryParts;
             private readonly bool _includeTotalCount;
+            private readonly bool _includeDeleted;
 
-            public QueryOptionsHeader(IEnumerable<ServiceQueryPart> queryParts, bool includeTotalCount)
+            public QueryOptionsHeader(IEnumerable<ServiceQueryPart> queryParts, bool includeTotalCount, bool includeDeleted)
             {
                 _queryParts = queryParts;
                 _includeTotalCount = includeTotalCount;
+                _includeDeleted = includeDeleted;
             }
 
             public override string Name => QueryHeaderName;
@@ -90,6 +96,14 @@ namespace OpenRiaServices.Client.Web.Internal
                 {
                     writer.WriteStartElement(QueryOptionElementName);
                     writer.WriteAttributeString(QueryNameAttribute, QueryIncludeTotalCountOption);
+                    writer.WriteAttributeString(QueryValueAttribute, "true");
+                    writer.WriteEndElement();
+                }
+
+                if (_includeDeleted)
+                {
+                    writer.WriteStartElement(QueryOptionElementName);
+                    writer.WriteAttributeString(QueryNameAttribute, QueryIncludeDeletedOption);
                     writer.WriteAttributeString(QueryValueAttribute, "true");
                     writer.WriteEndElement();
                 }

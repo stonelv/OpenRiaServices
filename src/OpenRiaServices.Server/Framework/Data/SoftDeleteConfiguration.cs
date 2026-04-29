@@ -7,7 +7,7 @@ namespace OpenRiaServices.Server
     /// <summary>
     /// Provides information about soft delete configuration for an entity type.
     /// </summary>
-    internal sealed class SoftDeleteConfiguration
+    public sealed class SoftDeleteConfiguration
     {
         private readonly PropertyInfo _propertyInfo;
         private readonly PropertyDescriptor _propertyDescriptor;
