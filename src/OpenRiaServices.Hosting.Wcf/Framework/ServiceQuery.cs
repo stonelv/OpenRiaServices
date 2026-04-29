@@ -11,6 +11,8 @@ namespace OpenRiaServices.Hosting
     internal class ServiceQuery
     {
         internal const string QueryPropertyName = "DomainServiceQuery";
+        internal const string IncludeTotalCountPropertyName = "DomainServiceIncludeTotalCount";
+        internal const string IncludeDeletedPropertyName = "DomainServiceIncludeDeleted";
 
         /// <summary>
         /// Gets or sets a list of query parts.
@@ -26,6 +28,16 @@ namespace OpenRiaServices.Hosting
         /// property is required in the result.
         /// </summary>
         public bool IncludeTotalCount
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether soft-deleted entities 
+        /// should be included in the query results.
+        /// </summary>
+        public bool IncludeDeleted
         {
             get;
             set;

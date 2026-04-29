@@ -32,6 +32,7 @@ namespace OpenRiaServices.Client
         private const string QueryNameAttribute = "Name";
         private const string QueryValueAttribute = "Value";
         private const string QueryIncludeTotalCountOption = "includeTotalCount";
+        private const string QueryIncludeDeletedOption = "includeDeleted";
 
         /// <summary>
         /// Checks if the HTTP method used is POST.
@@ -184,6 +185,7 @@ namespace OpenRiaServices.Client
         {
             List<ServiceQueryPart> serviceQueryParts = new List<ServiceQueryPart>();
             bool includeTotalCount = false;
+            bool includeDeleted = false;
             while (reader.IsStartElement(QueryOptionElementName))
             {
                 string name = reader.GetAttribute(QueryNameAttribute);
@@ -194,6 +196,14 @@ namespace OpenRiaServices.Client
                     if (Boolean.TryParse(value, out queryOptionValue))
                     {
                         includeTotalCount = queryOptionValue;
+                    }
+                }
+                else if (name.Equals(QueryIncludeDeletedOption, StringComparison.OrdinalIgnoreCase))
+                {
+                    bool queryOptionValue = false;
+                    if (Boolean.TryParse(value, out queryOptionValue))
+                    {
+                        includeDeleted = queryOptionValue;
                     }
                 }
                 else
@@ -207,7 +217,8 @@ namespace OpenRiaServices.Client
             ServiceQuery serviceQuery = new ServiceQuery()
             {
                 QueryParts = serviceQueryParts,
-                IncludeTotalCount = includeTotalCount
+                IncludeTotalCount = includeTotalCount,
+                IncludeDeleted = includeDeleted
             };
             return serviceQuery;
         }

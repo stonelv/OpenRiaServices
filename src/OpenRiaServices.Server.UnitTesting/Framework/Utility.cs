@@ -32,6 +32,11 @@ namespace OpenRiaServices.Server.UnitTesting
 
         public static QueryDescription GetQueryDescription(OperationContext context, Expression expression)
         {
+            return GetQueryDescription(context, expression, includeDeleted: false);
+        }
+
+        public static QueryDescription GetQueryDescription(OperationContext context, Expression expression, bool includeDeleted)
+        {
             context.OperationName = Utility.GetNameFromLambda(expression);
             IEnumerable<object> parameterValues = Utility.GetParametersFromLambda(expression);
 
@@ -45,7 +50,7 @@ namespace OpenRiaServices.Server.UnitTesting
                     context.DomainServiceDescription.DomainServiceType));
             }
 
-            return new QueryDescription(domainOperationEntry, parameterValues.ToArray());
+            return new QueryDescription(domainOperationEntry, parameterValues.ToArray(), includeDeleted);
         }
 
         public static InvokeDescription GetInvokeDescription(OperationContext context, Expression expression)

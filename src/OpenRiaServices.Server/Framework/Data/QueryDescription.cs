@@ -14,6 +14,7 @@ namespace OpenRiaServices.Server
         private object[] _parameterValues;
         private readonly IQueryable _query;
         private readonly bool _includeTotalCount;
+        private readonly bool _includeDeleted;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="QueryDescription"/> class with the specified
@@ -43,6 +44,20 @@ namespace OpenRiaServices.Server
 
             this._parameterValues = parameterValues;
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="QueryDescription"/> class with the specified
+        /// <see cref="DomainOperationEntry"/>, parameter values and flag indicating whether
+        /// to include soft-deleted entities in the result.
+        /// </summary>
+        /// <param name="domainOperationEntry">The query operation to be processed</param>
+        /// <param name="parameterValues">Parameter values for the method if it requires any</param>
+        /// <param name="includeDeleted">Flag to indicate that soft-deleted entities should be included in the results</param>
+        public QueryDescription(DomainOperationEntry domainOperationEntry, object[] parameterValues, bool includeDeleted) 
+            : this(domainOperationEntry, parameterValues)
+        {
+            this._includeDeleted = includeDeleted;
+        }
        
         /// <summary>
         /// Initializes a new instance of the <see cref="QueryDescription"/> class with the specified
@@ -59,6 +74,25 @@ namespace OpenRiaServices.Server
         {
             this._query = query;
             this._includeTotalCount = includeTotalCount;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="QueryDescription"/> class with the specified
+        /// <see cref="DomainOperationEntry"/>, parameter values, flags indicating whether
+        /// to evaluate and include total entity count and soft-deleted entities in the result,
+        /// and (optional) query to compose over the results.
+        /// </summary>
+        /// <param name="domainOperationEntry">The query operation to be processed</param>
+        /// <param name="parameterValues">Parameter values for the method if it requires any</param>
+        /// <param name="includeTotalCount">Flag to indicate that total entity count is required</param>
+        /// <param name="includeDeleted">Flag to indicate that soft-deleted entities should be included in the results</param>
+        /// <param name="query">The query to compose over the results</param>
+        public QueryDescription(DomainOperationEntry domainOperationEntry, object[] parameterValues, bool includeTotalCount, bool includeDeleted, IQueryable query)
+            : this(domainOperationEntry, parameterValues)
+        {
+            this._query = query;
+            this._includeTotalCount = includeTotalCount;
+            this._includeDeleted = includeDeleted;
         }
 
         /// <summary>
@@ -106,6 +140,18 @@ namespace OpenRiaServices.Server
             get
             {
                 return this._includeTotalCount;
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether soft-deleted entities should be included in the query results.
+        /// By default, soft-deleted entities are excluded from query results.
+        /// </summary>
+        public bool IncludeDeleted
+        {
+            get
+            {
+                return this._includeDeleted;
             }
         }
     }

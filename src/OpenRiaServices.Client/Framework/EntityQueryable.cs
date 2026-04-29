@@ -153,5 +153,23 @@ namespace OpenRiaServices.Client
             ArgumentNullException.ThrowIfNull(selector);
             return new EntityQuery<TEntity>(source, Queryable.Select<TEntity, TEntity>(source.QueryRoot, selector));
         }
+
+        /// <summary>
+        /// Instructs the query to include soft-deleted entities in the results.
+        /// By default, soft-deleted entities are excluded from query results.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity Type being queried.</typeparam>
+        /// <param name="source">The source query.</param>
+        /// <returns>The query with soft-deleted entities included.</returns>
+        /// <remarks>
+        /// This method only has effect if the entity type is marked with <see cref="SoftDeleteAttribute"/>
+        /// and the DomainService is configured to support soft deletion.
+        /// </remarks>
+        public static EntityQuery<TEntity> IncludeDeleted<TEntity>(this EntityQuery<TEntity> source) where TEntity : Entity
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            source.IncludeDeleted = true;
+            return source;
+        }
     }
 }

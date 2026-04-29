@@ -18,6 +18,7 @@ namespace OpenRiaServices.Client
         private readonly bool _hasSideEffects;
         private readonly bool _isComposable;
         private bool _includeTotalCount;
+        private bool _includeDeleted;
         private IQueryable? _query;
         private readonly DomainClient _domainClient;
 
@@ -62,6 +63,7 @@ namespace OpenRiaServices.Client
             this._hasSideEffects = baseQuery._hasSideEffects;
             this._isComposable = baseQuery._isComposable;
             this._includeTotalCount = baseQuery._includeTotalCount;
+            this._includeDeleted = baseQuery._includeDeleted;
             this._query = query;
         }
 
@@ -160,6 +162,22 @@ namespace OpenRiaServices.Client
             set
             {
                 this._includeTotalCount = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether soft-deleted entities should be included in the query results.
+        /// By default, soft-deleted entities are excluded from query results.
+        /// </summary>
+        public bool IncludeDeleted
+        {
+            get
+            {
+                return this._includeDeleted;
+            }
+            set
+            {
+                this._includeDeleted = value;
             }
         }
     }

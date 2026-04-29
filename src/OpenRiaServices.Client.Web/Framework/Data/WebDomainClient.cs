@@ -26,6 +26,7 @@ namespace OpenRiaServices.Client
     {
         internal const string QueryPropertyName = "DomainServiceQuery";
         internal const string IncludeTotalCountPropertyName = "DomainServiceIncludeTotalCount";
+        internal const string IncludeDeletedPropertyName = "DomainServiceIncludeDeleted";
 
         private ChannelFactory<TContract> _channelFactory;
         private IReadOnlyList<Type> _knownTypes;
@@ -230,6 +231,10 @@ namespace OpenRiaServices.Client
                 if (query.IncludeTotalCount)
                 {
                     OperationContext.Current.OutgoingMessageProperties.Add(WebDomainClient<object>.IncludeTotalCountPropertyName, true);
+                }
+                if (query.IncludeDeleted)
+                {
+                    OperationContext.Current.OutgoingMessageProperties.Add(WebDomainClient<object>.IncludeDeletedPropertyName, true);
                 }
 
                 return CallServiceOperation<QueryCompletedResult>(channel,

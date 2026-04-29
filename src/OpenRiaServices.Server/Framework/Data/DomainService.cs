@@ -286,6 +286,7 @@ namespace OpenRiaServices.Server
                 object? result = null;
 
                 this.ServiceContext.Operation = queryDescription.Method;
+                this.OnQueryExecuting(queryDescription);
                 try
                 {
                     try
@@ -327,6 +328,7 @@ namespace OpenRiaServices.Server
                 finally
                 {
                     this.ServiceContext.Operation = null;
+                    this.OnQueryExecuted();
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -493,6 +495,7 @@ namespace OpenRiaServices.Server
                 this.EnsureInitialized();
                 this.CheckOperationType(DomainOperationType.Submit);
                 this.ResolveOperations();
+                this.ProcessSoftDeletes();
 
                 if (!this.AuthorizeChangeSet())
                 {
@@ -786,6 +789,118 @@ namespace OpenRiaServices.Server
         /// <param name="cancellationToken"><see cref="CancellationToken"/> which may be used by hosting layer to request cancellation</param>
         /// <returns>True if the <see cref="ChangeSet"/> was persisted successfully, false otherwise.</returns>
         protected virtual ValueTask<bool> PersistChangeSetAsync(CancellationToken cancellationToken) { return new ValueTask<bool>(true); }
+
+        /// <summary>
+        /// Gets a value indicating whether the current query should include soft-deleted entities.
+        /// This property is set based on the <see cref="QueryDescription.IncludeDeleted"/> value
+        /// before the query operation is executed.
+        /// </summary>
+        /// <remarks>
+        /// Subclasses can use this property to determine whether to apply soft delete filters.
+        /// For example, <see cref="DbDomainService{TContext}"/> can use this to decide whether
+        /// to ignore EF Core query filters for soft deletion.
+        /// </remarks>
+        protected bool ShouldIncludeDeleted { get; private set; }
+
+        /// <summary>
+        /// Called before a query operation is executed. Override this method to perform
+        /// any necessary initialization based on the query description.
+        /// </summary>
+        /// <param name="queryDescription">The description of the query to be executed.</param>
+        /// <remarks>
+        /// The default implementation sets the <see cref="ShouldIncludeDeleted"/> property
+        /// based on <see cref="QueryDescription.IncludeDeleted"/>.
+        /// </remarks>
+        protected virtual void OnQueryExecuting(QueryDescription queryDescription)
+        {
+            if (queryDescription == null)
+            {
+                throw new ArgumentNullException(nameof(queryDescription));
+            }
+
+            this.ShouldIncludeDeleted = queryDescription.IncludeDeleted;
+        }
+
+        /// <summary>
+        /// Called after a query operation has been executed. Override this method to perform
+        /// any necessary cleanup.
+        /// </summary>
+        /// <remarks>
+        /// The default implementation resets the <see cref="ShouldIncludeDeleted"/> property.
+        /// </remarks>
+        protected virtual void OnQueryExecuted()
+        {
+            this.ShouldIncludeDeleted = false;
+        }
+
+        /// <summary>
+        /// Called before invoking a Delete operation for an entity that supports soft deletion.
+        /// Override this method to customize soft deletion behavior.
+        /// </summary>
+        /// <param name="entity">The entity being deleted.</param>
+        /// <param name="softDeleteConfig">The soft delete configuration for the entity type.</param>
+        /// <returns>True if the delete operation should be converted to an update operation;
+        /// false if the original delete operation should proceed.</returns>
+        /// <remarks>
+        /// The default implementation sets the soft delete flag on the entity and returns true,
+        /// which causes the operation to be converted to an update.
+        /// </remarks>
+        protected virtual bool OnSoftDelete(object entity, SoftDeleteConfiguration softDeleteConfig)
+        {
+            if (entity == null)
+            {
+                throw new ArgumentNullException(nameof(entity));
+            }
+            if (softDeleteConfig == null)
+            {
+                throw new ArgumentNullException(nameof(softDeleteConfig));
+            }
+
+            softDeleteConfig.MarkAsDeleted(entity);
+            return true;
+        }
+
+        /// <summary>
+        /// Processes soft delete operations in the current changeset.
+        /// This method is called after <see cref="ResolveOperations"/> but before
+        /// <see cref="AuthorizeChangeSet"/>.
+        /// </summary>
+        private void ProcessSoftDeletes()
+        {
+            foreach (ChangeSetEntry changeSetEntry in this.ChangeSet!.ChangeSetEntries)
+            {
+                if (changeSetEntry.Operation != DomainOperation.Delete)
+                {
+                    continue;
+                }
+
+                object entity = changeSetEntry.Entity;
+                MetaType metaType = MetaType.GetMetaType(entity.GetType());
+
+                if (!metaType.IsSoftDeleteEnabled)
+                {
+                    continue;
+                }
+
+                SoftDeleteConfiguration? softDeleteConfig = metaType.SoftDeleteConfiguration;
+                if (softDeleteConfig == null)
+                {
+                    continue;
+                }
+
+                bool convertToUpdate = this.OnSoftDelete(entity, softDeleteConfig);
+
+                if (convertToUpdate)
+                {
+                    Type entityType = entity.GetType();
+                    DomainOperationEntry? updateMethod = this.ServiceDescription.GetSubmitMethod(entityType, DomainOperation.Update);
+
+                    changeSetEntry.Operation = DomainOperation.Update;
+                    changeSetEntry.DomainOperationEntry = updateMethod;
+                    changeSetEntry.HasMemberChanges = true;
+                }
+            }
+        }
 
         /// <summary>
         /// For all operations in the current changeset, validate that the operation exists, and
