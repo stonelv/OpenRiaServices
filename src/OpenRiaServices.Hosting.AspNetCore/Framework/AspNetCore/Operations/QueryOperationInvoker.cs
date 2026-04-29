@@ -102,6 +102,7 @@ namespace OpenRiaServices.Hosting.AspNetCore.Operations
             var queryPartCollection = httpRequest.Query;
             string fullRequestUrl = httpRequest.QueryString.Value;
             bool includeTotalCount = false;
+            bool includeDeleted = false;
             var queryParts = new List<string>();
             foreach (string queryPart in queryPartCollection.Keys)
             {
@@ -115,6 +116,13 @@ namespace OpenRiaServices.Hosting.AspNetCore.Operations
                 {
                     string value = queryPartCollection[queryPart].First();
                     _ = bool.TryParse(value, out includeTotalCount);
+                    continue;
+                }
+
+                if (queryPart.Equals("$includeDeleted", StringComparison.OrdinalIgnoreCase))
+                {
+                    string value = queryPartCollection[queryPart].First();
+                    _ = bool.TryParse(value, out includeDeleted);
                     continue;
                 }
 
@@ -159,7 +167,8 @@ namespace OpenRiaServices.Hosting.AspNetCore.Operations
             var serviceQuery = new ServiceQuery()
             {
                 QueryParts = serviceQueryParts.ToList(),
-                IncludeTotalCount = includeTotalCount
+                IncludeTotalCount = includeTotalCount,
+                IncludeDeleted = includeDeleted
             };
 
             return serviceQuery;

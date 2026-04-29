@@ -116,6 +116,12 @@ namespace OpenRiaServices.EntityFramework
         /// <returns>The total number of rows.</returns>
         protected override ValueTask<int> CountAsync<T>(IQueryable<T> query, CancellationToken cancellationToken)
         {
+#if EFCORE
+            if (this.ShouldIncludeDeleted)
+            {
+                query = query.IgnoreQueryFilters();
+            }
+#endif
             return QueryHelper.CountAsync(query, cancellationToken);
         }
 
@@ -131,6 +137,11 @@ namespace OpenRiaServices.EntityFramework
         protected override ValueTask<IReadOnlyCollection<T>> EnumerateAsync<T>(IEnumerable enumerable, int estimatedResultCount, CancellationToken cancellationToken)
         {
 #if EFCORE
+            if (this.ShouldIncludeDeleted && enumerable is IQueryable<T> queryable)
+            {
+                enumerable = queryable.IgnoreQueryFilters();
+            }
+
             if (enumerable is IAsyncEnumerable<T> asyncEnumerable)
 #else
             if (enumerable is IDbAsyncEnumerable<T> asyncEnumerable)

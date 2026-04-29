@@ -52,6 +52,7 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
         private const string QueryNameAttribute = "Name";
         private const string QueryValueAttribute = "Value";
         private const string QueryIncludeTotalCountOption = "includeTotalCount";
+        private const string QueryIncludeDeletedOption = "includeDeleted";
         private const string InvalidContentMessage = "invalid content";
 
         private bool IsBinary { get; }
@@ -161,6 +162,7 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
         {
             var serviceQueryParts = new List<ServiceQueryPart>();
             bool includeTotalCount = false;
+            bool includeDeleted = false;
             while (reader.IsStartElement(QueryOptionElementName))
             {
                 string? name = reader.GetAttribute(QueryNameAttribute);
@@ -171,6 +173,14 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
                     if (bool.TryParse(value, out queryOptionValue))
                     {
                         includeTotalCount = queryOptionValue;
+                    }
+                }
+                else if (string.Equals(name, QueryIncludeDeletedOption, StringComparison.OrdinalIgnoreCase))
+                {
+                    bool queryOptionValue = false;
+                    if (bool.TryParse(value, out queryOptionValue))
+                    {
+                        includeDeleted = queryOptionValue;
                     }
                 }
                 else
@@ -184,7 +194,8 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
             var serviceQuery = new ServiceQuery()
             {
                 QueryParts = serviceQueryParts,
-                IncludeTotalCount = includeTotalCount
+                IncludeTotalCount = includeTotalCount,
+                IncludeDeleted = includeDeleted
             };
             return serviceQuery;
         }

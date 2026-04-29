@@ -130,6 +130,16 @@ namespace OpenRiaServices.Client.DomainClients.Http
                 });
             }
 
+            if (query.IncludeDeleted)
+            {
+                queryOptions = queryOptions ?? new List<ServiceQueryPart>();
+                queryOptions.Add(new ServiceQueryPart()
+                {
+                    QueryOperator = "includeDeleted",
+                    Expression = "True"
+                });
+            }
+
             var responseTask = ExecuteRequestAsync(query.QueryName, query.HasSideEffects, query.Parameters, queryOptions, cancellationToken);
             return QueryAsyncCoreContinuation();
 
