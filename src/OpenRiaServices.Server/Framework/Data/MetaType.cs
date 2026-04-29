@@ -28,6 +28,7 @@ namespace OpenRiaServices.Server
         private readonly bool _isComplex;
         private readonly Type _type;
         private readonly Dictionary<string, MetaMember> _metaMembers = new Dictionary<string, MetaMember>();
+        private readonly SoftDeleteConfiguration _softDeleteConfiguration;
 
         /// <summary>
         /// Returns the MetaType for the specified Type.
@@ -48,6 +49,8 @@ namespace OpenRiaServices.Server
         {
             this._type = type;
             this._isComplex = TypeUtility.IsComplexType(type);
+
+            SoftDeleteConfiguration.TryCreate(type, out _softDeleteConfiguration);
 
             // enumerate all properties and initialize property level info
             List<PropertyDescriptor> includedAssociations = new List<PropertyDescriptor>();
@@ -193,6 +196,28 @@ namespace OpenRiaServices.Server
             get
             {
                 return this._hasComposition;
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether this type supports soft deletion.
+        /// </summary>
+        public bool IsSoftDeleteEnabled
+        {
+            get
+            {
+                return this._softDeleteConfiguration != null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the soft delete configuration for this type, or null if soft delete is not enabled.
+        /// </summary>
+        public SoftDeleteConfiguration SoftDeleteConfiguration
+        {
+            get
+            {
+                return this._softDeleteConfiguration;
             }
         }
 

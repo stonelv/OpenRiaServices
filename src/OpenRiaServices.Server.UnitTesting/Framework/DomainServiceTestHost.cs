@@ -236,6 +236,18 @@ namespace OpenRiaServices.Server.UnitTesting
         }
 
         /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the results
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <returns>The entities returned from the specified operation</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public IEnumerable<TEntity> Query<TEntity>(Expression<Func<TDomainService, IQueryable<TEntity>>> queryOperation) where TEntity : class
+        {
+            return this.QueryCore<TEntity>(queryOperation);
+        }
+
+        /// <summary>
         /// Invokes the specified <paramref name="queryOperation"/> and returns the result
         /// </summary>
         /// <remarks>
@@ -334,6 +346,185 @@ namespace OpenRiaServices.Server.UnitTesting
             result = (results == null) ? null : results.SingleOrDefault();
             return success;
         }
+
+        #region Query With Deleted (Soft Delete Support)
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> asynchronously and returns the results,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="ct">The <see cref="CancellationToken"/></param>
+        /// <returns>The entities returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public Task<IEnumerable<TEntity>> QueryWithDeletedAsync<TEntity>(Expression<Func<TDomainService, Task<IEnumerable<TEntity>>>> queryOperation, CancellationToken ct = default)
+            where TEntity : class
+        {
+            return this.QueryCoreAsync<TEntity>(queryOperation, includeDeleted: true, ct);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> asynchronously and returns the results,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="ct">The <see cref="CancellationToken"/></param>
+        /// <returns>The entities returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public Task<IEnumerable<TEntity>> QueryWithDeletedAsync<TEntity>(Expression<Func<TDomainService, Task<IQueryable<TEntity>>>> queryOperation, CancellationToken ct = default)
+            where TEntity : class
+        {
+            return this.QueryCoreAsync<TEntity>(queryOperation, includeDeleted: true, ct);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> asynchronously and returns the results,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="ct">The <see cref="CancellationToken"/></param>
+        /// <returns>The entities returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public Task<IEnumerable<TEntity>> QueryWithDeletedAsync<TEntity>(Expression<Func<TDomainService, IQueryable<TEntity>>> queryOperation, CancellationToken ct = default)
+            where TEntity : class
+        {
+            return this.QueryCoreAsync<TEntity>(queryOperation, includeDeleted: true, ct);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the results,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <returns>The entities returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public IEnumerable<TEntity> QueryWithDeleted<TEntity>(Expression<Func<TDomainService, IEnumerable<TEntity>>> queryOperation) where TEntity : class
+        {
+            return this.QueryCore<TEntity>(queryOperation, includeDeleted: true);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the results,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <returns>The entities returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public IEnumerable<TEntity> QueryWithDeleted<TEntity>(Expression<Func<TDomainService, IQueryable<TEntity>>> queryOperation) where TEntity : class
+        {
+            return this.QueryCore<TEntity>(queryOperation, includeDeleted: true);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the result,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <remarks>
+        /// This method should be used for query signatures that do no return a collection
+        /// </remarks>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <returns>The entity returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public TEntity QuerySingleWithDeleted<TEntity>(Expression<Func<TDomainService, TEntity>> queryOperation) where TEntity : class
+        {
+            return this.QueryCore<TEntity>(queryOperation, includeDeleted: true).SingleOrDefault();
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> asynchronously and returns the result,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <remarks>
+        /// This method should be used for query signatures that do no return a collection
+        /// </remarks>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="ct">The <see cref="CancellationToken"/></param>
+        /// <returns>The entity returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public async Task<TEntity> QuerySingleWithDeletedAsync<TEntity>(Expression<Func<TDomainService, TEntity>> queryOperation, CancellationToken ct = default) where TEntity : class
+        {
+            return (await this.QueryCoreAsync<TEntity>(queryOperation, includeDeleted: true, ct)).SingleOrDefault();
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> asynchronously and returns the result,
+        /// including soft-deleted entities.
+        /// </summary>
+        /// <remarks>
+        /// This method should be used for query signatures that do no return a collection
+        /// </remarks>
+        /// <typeparam name="TEntity">The type of entity to return</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="ct">The <see cref="CancellationToken"/></param>
+        /// <returns>The entity returned from the specified operation, including soft-deleted ones</returns>
+        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
+        public async Task<TEntity> QuerySingleWithDeletedAsync<TEntity>(Expression<Func<TDomainService, Task<TEntity>>> queryOperation, CancellationToken ct = default) where TEntity : class
+        {
+            return (await this.QueryCoreAsync<TEntity>(queryOperation, includeDeleted: true, ct)).SingleOrDefault();
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the results, the validation errors,
+        /// and whether the operation completed successfully, including soft-deleted entities.
+        /// </summary>
+        /// <typeparam name="TEntity">The type of entity in the results</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="results">The entities returned from the specified operation, including soft-deleted ones</param>
+        /// <param name="validationErrors">The validation errors that occurred</param>
+        /// <returns>Whether the operation completed without error</returns>
+        public bool TryQueryWithDeleted<TEntity>(Expression<Func<TDomainService, IEnumerable<TEntity>>> queryOperation, out IEnumerable<TEntity> results, out IList<ValidationResult> validationErrors) where TEntity : class
+        {
+            return this.TryQueryCore<TEntity>(queryOperation, includeDeleted: true, out results, out validationErrors);
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the result, the validation errors,
+        /// and whether the operation completed successfully, including soft-deleted entities.
+        /// </summary>
+        /// <remarks>
+        /// This method should be used for query signatures that do no return a collection
+        /// </remarks>
+        /// <typeparam name="TEntity">The type of entity in the result</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="result">The entity returned from the specified operation, including soft-deleted ones</param>
+        /// <param name="validationErrors">The validation errors that occurred</param>
+        /// <returns>Whether the operation completed without error</returns>
+        public bool TryQuerySingleWithDeleted<TEntity>(Expression<Func<TDomainService, TEntity>> queryOperation, out TEntity result, out IList<ValidationResult> validationErrors) where TEntity : class
+        {
+            IEnumerable<TEntity> results;
+            bool success = this.TryQueryCore<TEntity>(queryOperation, includeDeleted: true, out results, out validationErrors);
+            result = (results == null) ? null : results.SingleOrDefault();
+            return success;
+        }
+
+        /// <summary>
+        /// Invokes the specified <paramref name="queryOperation"/> and returns the result, the validation errors,
+        /// and whether the operation completed successfully, including soft-deleted entities.
+        /// </summary>
+        /// <remarks>
+        /// This method should be used for query signatures that do no return a collection
+        /// </remarks>
+        /// <typeparam name="TEntity">The type of entity in the result</typeparam>
+        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
+        /// <param name="result">The entity returned from the specified operation, including soft-deleted ones</param>
+        /// <param name="validationErrors">The validation errors that occurred</param>
+        /// <returns>Whether the operation completed without error</returns>
+        public bool TryQuerySingleWithDeleted<TEntity>(Expression<Func<TDomainService, Task<TEntity>>> queryOperation, out TEntity result, out IList<ValidationResult> validationErrors) where TEntity : class
+        {
+            IEnumerable<TEntity> results;
+            bool success = this.TryQueryCore<TEntity>(queryOperation, includeDeleted: true, out results, out validationErrors);
+            result = (results == null) ? null : results.SingleOrDefault();
+            return success;
+        }
+
+        #endregion
 
         #endregion
 
@@ -828,24 +1019,26 @@ namespace OpenRiaServices.Server.UnitTesting
         /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
         private IEnumerable<TEntity> QueryCore<TEntity>(Expression queryOperation) where TEntity : class
         {
-            return QueryCoreAsync<TEntity>(queryOperation, CancellationToken.None)
+            return QueryCore<TEntity>(queryOperation, includeDeleted: false);
+        }
+
+        private IEnumerable<TEntity> QueryCore<TEntity>(Expression queryOperation, bool includeDeleted) where TEntity : class
+        {
+            return QueryCoreAsync<TEntity>(queryOperation, includeDeleted, CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
         }
 
-        /// <summary>
-        /// Invokes the specified <paramref name="queryOperation"/> and returns the results
-        /// </summary>
-        /// <typeparam name="TEntity">The type of entity to return</typeparam>
-        /// <param name="queryOperation">The <see cref="Expression"/> identifying the query operation to invoke</param>
-        /// <param name="ct">The <see cref="CancellationToken"/></param>
-        /// <returns>The entities returned from the specified operation</returns>
-        /// <exception cref="DomainServiceTestHostException">is thrown if there are any validation errors</exception>
-        private async Task<IEnumerable<TEntity>> QueryCoreAsync<TEntity>(Expression queryOperation, CancellationToken ct) where TEntity : class
+        private Task<IEnumerable<TEntity>> QueryCoreAsync<TEntity>(Expression queryOperation, CancellationToken ct) where TEntity : class
+        {
+            return QueryCoreAsync<TEntity>(queryOperation, includeDeleted: false, ct);
+        }
+
+        private async Task<IEnumerable<TEntity>> QueryCoreAsync<TEntity>(Expression queryOperation, bool includeDeleted, CancellationToken ct) where TEntity : class
         {
             OperationContext context = this.CreateOperationContext(DomainOperationType.Query);
 
-            QueryDescription queryDescription = Utility.GetQueryDescription(context, queryOperation);
+            QueryDescription queryDescription = Utility.GetQueryDescription(context, queryOperation, includeDeleted);
 
             var queryResult = await context.DomainService.QueryAsync<TEntity>(queryDescription, ct);
 
@@ -866,13 +1059,17 @@ namespace OpenRiaServices.Server.UnitTesting
         /// <returns>Whether the operation completed without error</returns>
         private bool TryQueryCore<TEntity>(Expression queryOperation, out IEnumerable<TEntity> results, out IList<ValidationResult> validationResults) where TEntity : class
         {
+            return TryQueryCore<TEntity>(queryOperation, includeDeleted: false, out results, out validationResults);
+        }
+
+        private bool TryQueryCore<TEntity>(Expression queryOperation, bool includeDeleted, out IEnumerable<TEntity> results, out IList<ValidationResult> validationResults) where TEntity : class
+        {
             OperationContext context = this.CreateOperationContext(DomainOperationType.Query);
 
-            QueryDescription queryDescription = Utility.GetQueryDescription(context, queryOperation);
+            QueryDescription queryDescription = Utility.GetQueryDescription(context, queryOperation, includeDeleted);
             IEnumerable<ValidationResult> validationErrors;
 
             var queryTask = context.DomainService.QueryAsync<TEntity>(queryDescription, CancellationToken.None);
-            // TODO: Remove blocking wait
             var queryResult = Utility.SafeGetResult(queryTask);
             IEnumerable entities = queryResult.Result;
             validationErrors = queryResult.ValidationErrors;

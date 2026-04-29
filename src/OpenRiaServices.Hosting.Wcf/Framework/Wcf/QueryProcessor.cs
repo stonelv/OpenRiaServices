@@ -32,14 +32,16 @@ namespace OpenRiaServices.Hosting.Wcf
             // deserialize the query if specified
             IQueryable query = null;
             bool includeTotalCount = false;
+            bool includeDeleted = false;
             if (serviceQuery != null)
             {
                 query = GetQueryable<TEntity>(domainServiceDescription, serviceQuery);
                 includeTotalCount = serviceQuery.IncludeTotalCount;
+                includeDeleted = serviceQuery.IncludeDeleted;
             }
 
             // invoke the query operation
-            QueryDescription queryDescription = new QueryDescription(queryOperation, parameters, includeTotalCount, query);
+            QueryDescription queryDescription = new QueryDescription(queryOperation, parameters, includeTotalCount, includeDeleted, query);
             var res = await domainService.QueryAsync<TEntity>(queryDescription,  domainService.ServiceContext.CancellationToken);
 
             if (res.HasValidationErrors)

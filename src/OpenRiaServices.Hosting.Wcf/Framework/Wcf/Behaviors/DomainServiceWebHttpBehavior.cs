@@ -74,6 +74,7 @@ namespace OpenRiaServices.Hosting.Wcf.Behaviors
 
             NameValueCollection queryPartCollection = HttpUtility.ParseQueryString(queryString);
             bool includeTotalCount = false;
+            bool includeDeleted = false;
 
             // Reconstruct a list of all key/value pairs
             List<string> queryParts = new List<string>();
@@ -92,13 +93,20 @@ namespace OpenRiaServices.Hosting.Wcf.Behaviors
                     continue;
                 }
 
+                if (queryPart.Equals("$includeDeleted", StringComparison.OrdinalIgnoreCase))
+                {
+                    string value = queryPartCollection.GetValues(queryPart).First();
+                    Boolean.TryParse(value, out includeDeleted);
+                    continue;
+                }
+
                 foreach (string value in queryPartCollection.GetValues(queryPart))
                 {
                     queryParts.Add(queryPart + "=" + value);
                 }
             }
 
-            if (queryParts.Count == 0 && includeTotalCount == false)
+            if (queryParts.Count == 0 && includeTotalCount == false && includeDeleted == false)
                 return null;
 
 
@@ -137,7 +145,8 @@ namespace OpenRiaServices.Hosting.Wcf.Behaviors
             ServiceQuery serviceQuery = new ServiceQuery()
             {
                 QueryParts = serviceQueryParts.ToList(),
-                IncludeTotalCount = includeTotalCount
+                IncludeTotalCount = includeTotalCount,
+                IncludeDeleted = includeDeleted
             };
 
             return serviceQuery;
