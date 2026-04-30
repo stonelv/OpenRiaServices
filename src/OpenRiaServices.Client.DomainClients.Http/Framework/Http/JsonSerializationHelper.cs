@@ -88,9 +88,9 @@ namespace OpenRiaServices.Client.DomainClients.Http
 
     internal class DataMemberProperty
     {
-        public MetaMember MetaMember { get; set; }
-        public PropertyInfo PropertyInfo { get; set; }
-        public DataMemberAttribute DataMemberAttribute { get; set; }
+        public MetaMember MetaMember { get; set; } = null!;
+        public PropertyInfo PropertyInfo { get; set; } = null!;
+        public DataMemberAttribute? DataMemberAttribute { get; set; }
     }
 
     internal class DataContractJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
@@ -304,17 +304,17 @@ namespace OpenRiaServices.Client.DomainClients.Http
             }
 
             int id = 0;
-            Entity entity = null;
-            Entity originalEntity = null;
-            Entity storeEntity = null;
+            Entity? entity = null;
+            Entity? originalEntity = null;
+            Entity? storeEntity = null;
             EntityOperationType operation = EntityOperationType.None;
             bool hasMemberChanges = false;
-            IList<OpenRiaServices.Serialization.KeyValue<string, object[]>> entityActions = null;
-            IEnumerable<ValidationResultInfo> validationErrors = null;
-            IEnumerable<string> conflictMembers = null;
+            IList<OpenRiaServices.Serialization.KeyValue<string, object[]>>? entityActions = null;
+            IEnumerable<ValidationResultInfo>? validationErrors = null;
+            IEnumerable<string>? conflictMembers = null;
             bool isDeleteConflict = false;
-            IDictionary<string, int[]> associations = null;
-            IDictionary<string, int[]> originalAssociations = null;
+            IDictionary<string, int[]>? associations = null;
+            IDictionary<string, int[]>? originalAssociations = null;
 
             while (reader.Read())
             {
@@ -492,8 +492,8 @@ namespace OpenRiaServices.Client.DomainClients.Http
             }
 
             int totalCount = 0;
-            IEnumerable<T> rootResults = null;
-            IEnumerable<object> includedResults = null;
+            IEnumerable<T>? rootResults = null;
+            IEnumerable<object>? includedResults = null;
 
             while (reader.Read())
             {
@@ -525,7 +525,7 @@ namespace OpenRiaServices.Client.DomainClients.Http
                 }
             }
 
-            return new QueryResult<T>(rootResults, totalCount)
+            return new QueryResult<T>(rootResults ?? Enumerable.Empty<T>(), totalCount)
             {
                 IncludedResults = includedResults
             };
