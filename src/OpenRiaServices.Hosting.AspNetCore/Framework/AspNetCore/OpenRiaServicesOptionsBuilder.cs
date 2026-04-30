@@ -36,6 +36,17 @@ namespace OpenRiaServices.Hosting.AspNetCore
         }
 
         /// <summary>
+        /// Enables JSON wire format (application/json) in addition to built in binary Xml (application/msbin1).
+        /// </summary>
+        /// <remarks>Request should specify mime-type <c>application/json</c> using <c>Content-Type</c> or <c>Accept</c> HTTP-headers
+        /// </remarks>
+        /// <param name="defaultProvider">If <see langword="true"/> the Json provider will be the default for responses (when content type is not specified)</param>
+        public OpenRiaServicesOptionsBuilder AddJsonSerialization(bool defaultProvider = false)
+        {
+            return AddSerializationProvider(new Serialization.JsonSerializationProvider(), defaultProvider);
+        }
+
+        /// <summary>
         /// Removes all registered <see cref="Serialization.ISerializationProvider" />s.
         /// <para>Useful for removing default serialization formats (application/msbin1).</para>
         /// </summary>
