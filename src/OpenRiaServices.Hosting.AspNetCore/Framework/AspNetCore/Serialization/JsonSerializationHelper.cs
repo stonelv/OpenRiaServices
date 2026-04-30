@@ -75,9 +75,9 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
 
     internal class DataMemberProperty
     {
-        public MetaMember MetaMember { get; set; }
-        public PropertyInfo PropertyInfo { get; set; }
-        public DataMemberAttribute DataMemberAttribute { get; set; }
+        public MetaMember MetaMember { get; set; } = null!;
+        public PropertyInfo PropertyInfo { get; set; } = null!;
+        public DataMemberAttribute? DataMemberAttribute { get; set; }
     }
 
     internal class DataContractJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
@@ -392,8 +392,8 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
             }
 
             int totalCount = 0;
-            IEnumerable<T> rootResults = null;
-            IEnumerable<object> includedResults = null;
+            IEnumerable<T>? rootResults = null;
+            IEnumerable<object>? includedResults = null;
 
             while (reader.Read())
             {
@@ -425,7 +425,7 @@ namespace OpenRiaServices.Hosting.AspNetCore.Serialization
                 }
             }
 
-            return new QueryResult<T>(rootResults, totalCount)
+            return new QueryResult<T>(rootResults ?? Enumerable.Empty<T>(), totalCount)
             {
                 IncludedResults = includedResults
             };
