@@ -56,8 +56,9 @@ namespace Cities
         }
 
         [Query]
-        public IQueryable<City> GetCitiesWithPaging()
+        public IQueryable<City> GetCitiesWithPaging(out int totalCount)
         {
+            totalCount = -1;
             return this._cityData.Cities.AsQueryable<City>();
         }
 
