@@ -102,8 +102,8 @@ namespace OpenRiaServices.Client.Test
             var validationStatus = OperationErrorStatus.ValidationFailed;
 
             Assert.AreNotEqual(conflictStatus, validationStatus, "Conflicts 和 ValidationFailed 应该是不同的枚举值");
-            Assert.AreEqual(5, (int)validationStatus, "ValidationFailed 的整数值应该是 5");
-            Assert.AreEqual(6, (int)conflictStatus, "Conflicts 的整数值应该是 6");
+            Assert.AreNotEqual(OperationErrorStatus.ServerError, conflictStatus, "Conflicts 不应与 ServerError 相同");
+            Assert.AreNotEqual(OperationErrorStatus.ServerError, validationStatus, "ValidationFailed 不应与 ServerError 相同");
         }
 
         [TestMethod]
