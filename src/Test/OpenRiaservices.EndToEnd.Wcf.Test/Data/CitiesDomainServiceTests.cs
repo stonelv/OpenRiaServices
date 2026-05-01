@@ -371,7 +371,7 @@ namespace OpenRiaServices.Client.Test
                 var allCities = new CityData().Cities;
                 var waCities = allCities.Where(c => c.StateName == "WA").ToList();
 
-                Assert.AreEqual(allCities.Count, lo.TotalEntityCount, "TotalEntityCount should be the full count (from out parameter)");
+                Assert.AreEqual(waCities.Count, lo.TotalEntityCount, "TotalEntityCount should be the count after Where filter (before paging)");
                 Assert.AreEqual(waCities.Count, lo.Entities.Count(), "Should return only WA cities");
                 Assert.IsTrue(lo.Entities.All(c => c.StateName == "WA"), "All returned cities should be in WA state");
             });
@@ -572,7 +572,7 @@ namespace OpenRiaServices.Client.Test
                 var expectedPaged = waCities.Skip(skip).Take(take).Select(c => c.Name).ToList();
                 var resultNames = lo.Entities.Select(c => c.Name).ToList();
 
-                Assert.AreEqual(allCities.Count, lo.TotalEntityCount, "TotalEntityCount should be from out parameter (full count)");
+                Assert.AreEqual(waCities.Count, lo.TotalEntityCount, "TotalEntityCount should be the count after Where filter (before paging)");
                 Assert.AreEqual(expectedPaged.Count, lo.Entities.Count(), "Should return correct number of paged results");
                 CollectionAssert.AreEqual(expectedPaged, resultNames, "Results should be filtered, sorted, and paged correctly");
                 Assert.IsTrue(lo.Entities.All(c => c.StateName == "WA"), "All results should be filtered to WA state");
@@ -612,11 +612,13 @@ namespace OpenRiaServices.Client.Test
                     Assert.Fail("lo3.Error: " + lo3.Error.Message);
 
                 var allCities = new CityData().Cities;
+                var waCities = allCities.Where(c => c.StateName == "WA").ToList();
                 int expectedTotalCount = allCities.Count;
+                int expectedWaCount = waCities.Count;
 
                 Assert.AreEqual(expectedTotalCount, lo1.TotalEntityCount, "TotalCount should match for basic query");
-                Assert.AreEqual(expectedTotalCount, lo2.TotalEntityCount, "TotalCount should be consistent for paged query");
-                Assert.AreEqual(expectedTotalCount, lo3.TotalEntityCount, "TotalCount should be consistent for filtered and paged query");
+                Assert.AreEqual(expectedTotalCount, lo2.TotalEntityCount, "TotalCount should be consistent for paged query (no Where)");
+                Assert.AreEqual(expectedWaCount, lo3.TotalEntityCount, "TotalCount should be the count after Where filter (before paging)");
             });
 
             EnqueueTestComplete();
