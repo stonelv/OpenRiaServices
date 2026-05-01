@@ -252,6 +252,193 @@ namespace OpenRiaServices.Server.Test
             Assert.AreEqual(allResults.Results.Count(), results.TotalCount, "Unexpected total count.");
         }
 
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging query method with out int totalCount parameter")]
+        public async Task Query_GetCitiesWithPaging_Basic()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            Assert.IsNotNull(queryOperation, "GetCitiesWithPaging query method not found");
+
+            QueryDescription query = new QueryDescription(queryOperation, Array.Empty<object>(), true, null);
+            var queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+
+            var results = (IEnumerable<City>)queryResult.Result;
+            int totalCount = queryResult.TotalCount;
+
+            int expectedTotalCount = new CityData().Cities.Count;
+            Assert.AreEqual(expectedTotalCount, totalCount, "TotalCount should match the total number of cities");
+            Assert.AreEqual(expectedTotalCount, results.Count(), "Should return all cities when no paging is applied");
+        }
+
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging with Where filter")]
+        public async Task Query_GetCitiesWithPaging_WhereFilter()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            IQueryable<City> filter = Array.Empty<City>().AsQueryable().Where(c => c.StateName == "WA");
+            QueryDescription query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            var queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+
+            var results = (IEnumerable<City>)queryResult.Result;
+            int totalCount = queryResult.TotalCount;
+
+            var expectedCities = new CityData().Cities.Where(c => c.StateName == "WA").ToList();
+            int expectedTotalCount = new CityData().Cities.Count;
+
+            Assert.AreEqual(expectedTotalCount, totalCount, "TotalCount should be the full count (from out parameter)");
+            Assert.AreEqual(expectedCities.Count, results.Count(), "Should return only WA cities after Where filter");
+            Assert.IsTrue(results.All(c => c.StateName == "WA"), "All returned cities should be in WA state");
+        }
+
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging with OrderBy")]
+        public async Task Query_GetCitiesWithPaging_OrderBy()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            IQueryable<City> filter = Array.Empty<City>().AsQueryable().OrderBy(c => c.Name);
+            QueryDescription query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            var queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+
+            var results = (IEnumerable<City>)queryResult.Result;
+            int totalCount = queryResult.TotalCount;
+
+            var expectedCities = new CityData().Cities;
+            var sortedNames = expectedCities.OrderBy(c => c.Name).Select(c => c.Name).ToList();
+            var resultNames = results.Select(c => c.Name).ToList();
+
+            Assert.AreEqual(expectedCities.Count, totalCount, "TotalCount should be correct");
+            CollectionAssert.AreEqual(sortedNames, resultNames, "Cities should be ordered by Name");
+        }
+
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging with Skip and Take for paging")]
+        public async Task Query_GetCitiesWithPaging_SkipTake()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            int skip = 3;
+            int take = 5;
+            IQueryable<City> filter = Array.Empty<City>().AsQueryable().Skip(skip).Take(take);
+            QueryDescription query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            var queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+
+            var results = (IEnumerable<City>)queryResult.Result;
+            int totalCount = queryResult.TotalCount;
+
+            var expectedCities = new CityData().Cities;
+            int expectedTotalCount = expectedCities.Count;
+            int expectedResultCount = Math.Min(take, expectedTotalCount - skip);
+
+            Assert.AreEqual(expectedTotalCount, totalCount, "TotalCount should be the full count, not the paged count");
+            Assert.AreEqual(expectedResultCount, results.Count(), "Should return only the paged subset");
+        }
+
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging with combined Where, OrderBy, Skip, Take")]
+        public async Task Query_GetCitiesWithPaging_CombinedQuery()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            var allCities = new CityData().Cities;
+            var waCities = allCities.Where(c => c.StateName == "WA").OrderBy(c => c.Name).ToList();
+            int skip = 1;
+            int take = 3;
+
+            IQueryable<City> filter = Array.Empty<City>().AsQueryable()
+                .Where(c => c.StateName == "WA")
+                .OrderBy(c => c.Name)
+                .Skip(skip)
+                .Take(take);
+
+            QueryDescription query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            var queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+
+            var results = (IEnumerable<City>)queryResult.Result;
+            int totalCount = queryResult.TotalCount;
+
+            var expectedPaged = waCities.Skip(skip).Take(take).Select(c => c.Name).ToList();
+            var resultNames = results.Select(c => c.Name).ToList();
+
+            Assert.AreEqual(allCities.Count, totalCount, "TotalCount should be from out parameter (full count)");
+            Assert.AreEqual(expectedPaged.Count, results.Count(), "Should return correct number of paged results");
+            CollectionAssert.AreEqual(expectedPaged, resultNames, "Results should be filtered, sorted, and paged correctly");
+        }
+
+        [TestMethod]
+        [Description("Test GetCitiesWithPaging paging boundary conditions")]
+        public async Task Query_GetCitiesWithPaging_PagingBoundaries()
+        {
+            CityDomainService ds = new CityDomainService();
+            DomainServiceContext dsc = new DomainServiceContext(new MockDataService(), new MockUser("mathew"), DomainOperationType.Query);
+            ds.Initialize(dsc);
+
+            DomainServiceDescription desc = DomainServiceDescription.GetDescription(typeof(CityDomainService));
+            DomainOperationEntry queryOperation = desc.GetQueryMethod("GetCitiesWithPaging");
+
+            var allCities = new CityData().Cities;
+            int totalCities = allCities.Count;
+
+            IQueryable<City> filter;
+            QueryDescription query;
+            ServiceQueryResult<City> queryResult;
+            IEnumerable<City> results;
+
+            filter = Array.Empty<City>().AsQueryable().Skip(totalCities);
+            query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+            results = (IEnumerable<City>)queryResult.Result;
+            Assert.AreEqual(totalCities, queryResult.TotalCount, "TotalCount should still be correct when skip exceeds count");
+            Assert.AreEqual(0, results.Count(), "Should return 0 results when Skip equals total count");
+
+            filter = Array.Empty<City>().AsQueryable().Skip(totalCities + 10);
+            query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+            results = (IEnumerable<City>)queryResult.Result;
+            Assert.AreEqual(0, results.Count(), "Should return 0 results when Skip exceeds total count");
+
+            filter = Array.Empty<City>().AsQueryable().Take(totalCities + 10);
+            query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+            results = (IEnumerable<City>)queryResult.Result;
+            Assert.AreEqual(totalCities, queryResult.TotalCount, "TotalCount should be correct");
+            Assert.AreEqual(totalCities, results.Count(), "Should return all results when Take exceeds count");
+
+            filter = Array.Empty<City>().AsQueryable().Skip(0).Take(0);
+            query = new QueryDescription(queryOperation, Array.Empty<object>(), true, filter);
+            queryResult = await ds.QueryAsync<City>(query, CancellationToken.None);
+            results = (IEnumerable<City>)queryResult.Result;
+            Assert.AreEqual(totalCities, queryResult.TotalCount, "TotalCount should still be correct with Take(0)");
+            Assert.AreEqual(0, results.Count(), "Should return 0 results with Take(0)");
+        }
+
         /// <summary>
         /// Verify that the OnError handler is called at the appropriate times
         /// for Query operations.
