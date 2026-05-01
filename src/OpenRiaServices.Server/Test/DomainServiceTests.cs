@@ -253,7 +253,7 @@ namespace OpenRiaServices.Server.Test
         }
 
         [TestMethod]
-        [Description("Test GetCitiesWithPaging query method with out int totalCount parameter")]
+        [Description("Test GetCitiesWithPaging query method - TotalCount is count after Where, before paging")]
         public async Task Query_GetCitiesWithPaging_Basic()
         {
             CityDomainService ds = new CityDomainService();
@@ -295,9 +295,9 @@ namespace OpenRiaServices.Server.Test
             int totalCount = queryResult.TotalCount;
 
             var expectedCities = new CityData().Cities.Where(c => c.StateName == "WA").ToList();
-            int expectedTotalCount = new CityData().Cities.Count;
+            int expectedTotalCount = expectedCities.Count;
 
-            Assert.AreEqual(expectedTotalCount, totalCount, "TotalCount should be the full count (from out parameter)");
+            Assert.AreEqual(expectedTotalCount, totalCount, "TotalCount should be the count after Where filter (before paging)");
             Assert.AreEqual(expectedCities.Count, results.Count(), "Should return only WA cities after Where filter");
             Assert.IsTrue(results.All(c => c.StateName == "WA"), "All returned cities should be in WA state");
         }
@@ -387,7 +387,7 @@ namespace OpenRiaServices.Server.Test
             var expectedPaged = waCities.Skip(skip).Take(take).Select(c => c.Name).ToList();
             var resultNames = results.Select(c => c.Name).ToList();
 
-            Assert.AreEqual(allCities.Count, totalCount, "TotalCount should be from out parameter (full count)");
+            Assert.AreEqual(waCities.Count, totalCount, "TotalCount should be the count after Where filter (before paging)");
             Assert.AreEqual(expectedPaged.Count, results.Count(), "Should return correct number of paged results");
             CollectionAssert.AreEqual(expectedPaged, resultNames, "Results should be filtered, sorted, and paged correctly");
         }
