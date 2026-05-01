@@ -323,5 +323,305 @@ namespace OpenRiaServices.Client.Test
                 Assert.IsTrue(actual.Contains(s), "Expected to find " + s);
             Assert.AreEqual(expected.Count(), actual.Count());
         }
+
+        #region GetCitiesWithPaging End-to-End Tests
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPagingQuery basic query with TotalCount")]
+        public void Cities_GetCitiesWithPaging_Basic()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+
+            var query = dp.GetCitiesWithPagingQuery();
+            LoadOperation<City> lo = dp.Load(query, false);
+
+            this.EnqueueCompletion(() => lo);
+
+            EnqueueCallback(() =>
+            {
+                if (lo.Error != null)
+                    Assert.Fail("LoadOperation.Error: " + lo.Error.Message);
+
+                var expectedCities = new CityData().Cities;
+                Assert.AreEqual(expectedCities.Count, lo.TotalEntityCount, "TotalEntityCount should match total number of cities");
+                Assert.AreEqual(expectedCities.Count, lo.Entities.Count(), "Should return all cities when no paging is applied");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging with Where filter")]
+        public void Cities_GetCitiesWithPaging_WhereFilter()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+
+            var query = dp.GetCitiesWithPagingQuery().Where(c => c.StateName == "WA");
+            LoadOperation<City> lo = dp.Load(query, false);
+
+            this.EnqueueCompletion(() => lo);
+
+            EnqueueCallback(() =>
+            {
+                if (lo.Error != null)
+                    Assert.Fail("LoadOperation.Error: " + lo.Error.Message);
+
+                var allCities = new CityData().Cities;
+                var waCities = allCities.Where(c => c.StateName == "WA").ToList();
+
+                Assert.AreEqual(allCities.Count, lo.TotalEntityCount, "TotalEntityCount should be the full count (from out parameter)");
+                Assert.AreEqual(waCities.Count, lo.Entities.Count(), "Should return only WA cities");
+                Assert.IsTrue(lo.Entities.All(c => c.StateName == "WA"), "All returned cities should be in WA state");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging with OrderBy - ordering stability")]
+        public void Cities_GetCitiesWithPaging_OrderBy_Stability()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp2 = new CityDomainContext(TestURIs.Cities);
+
+            var query = dp.GetCitiesWithPagingQuery().OrderBy(c => c.Name).ThenBy(c => c.StateName);
+            var query2 = dp2.GetCitiesWithPagingQuery().OrderBy(c => c.Name).ThenBy(c => c.StateName);
+
+            LoadOperation<City> lo = dp.Load(query, false);
+            LoadOperation<City> lo2 = dp2.Load(query2, false);
+
+            this.EnqueueCompletion(() => lo);
+            this.EnqueueCompletion(() => lo2);
+
+            EnqueueCallback(() =>
+            {
+                if (lo.Error != null)
+                    Assert.Fail("LoadOperation.Error: " + lo.Error.Message);
+                if (lo2.Error != null)
+                    Assert.Fail("LoadOperation2.Error: " + lo2.Error.Message);
+
+                var names1 = lo.Entities.Select(c => c.Name + "|" + c.StateName).ToList();
+                var names2 = lo2.Entities.Select(c => c.Name + "|" + c.StateName).ToList();
+
+                CollectionAssert.AreEqual(names1, names2, "Ordering should be stable across multiple queries");
+
+                var expected = new CityData().Cities
+                    .OrderBy(c => c.Name)
+                    .ThenBy(c => c.StateName)
+                    .Select(c => c.Name + "|" + c.StateName)
+                    .ToList();
+
+                CollectionAssert.AreEqual(expected, names1, "Ordering should match expected sorted order");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging with OrderByDescending")]
+        public void Cities_GetCitiesWithPaging_OrderByDescending()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+
+            var query = dp.GetCitiesWithPagingQuery().OrderByDescending(c => c.Name);
+            LoadOperation<City> lo = dp.Load(query, false);
+
+            this.EnqueueCompletion(() => lo);
+
+            EnqueueCallback(() =>
+            {
+                if (lo.Error != null)
+                    Assert.Fail("LoadOperation.Error: " + lo.Error.Message);
+
+                var names = lo.Entities.Select(c => c.Name).ToList();
+                var expectedDescending = new CityData().Cities
+                    .OrderByDescending(c => c.Name)
+                    .Select(c => c.Name)
+                    .ToList();
+
+                CollectionAssert.AreEqual(expectedDescending, names, "Should be ordered in descending order");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging with Skip and Take for paging")]
+        public void Cities_GetCitiesWithPaging_SkipTake()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp2 = new CityDomainContext(TestURIs.Cities);
+
+            int skip = 2;
+            int take = 3;
+
+            var allQuery = dp.GetCitiesWithPagingQuery().OrderBy(c => c.Name);
+            var pagedQuery = dp2.GetCitiesWithPagingQuery().OrderBy(c => c.Name).Skip(skip).Take(take);
+
+            LoadOperation<City> loAll = dp.Load(allQuery, false);
+            LoadOperation<City> loPaged = dp2.Load(pagedQuery, false);
+
+            this.EnqueueCompletion(() => loAll);
+            this.EnqueueCompletion(() => loPaged);
+
+            EnqueueCallback(() =>
+            {
+                if (loAll.Error != null)
+                    Assert.Fail("loAll.Error: " + loAll.Error.Message);
+                if (loPaged.Error != null)
+                    Assert.Fail("loPaged.Error: " + loPaged.Error.Message);
+
+                var allCities = new CityData().Cities;
+                var expectedPaged = allCities
+                    .OrderBy(c => c.Name)
+                    .Skip(skip)
+                    .Take(take)
+                    .Select(c => c.Name)
+                    .ToList();
+
+                Assert.AreEqual(allCities.Count, loAll.TotalEntityCount, "TotalEntityCount should be full count for all query");
+                Assert.AreEqual(allCities.Count, loPaged.TotalEntityCount, "TotalEntityCount should be full count even for paged query");
+
+                Assert.AreEqual(take, loPaged.Entities.Count(), "Should return exactly 'take' items");
+
+                var pagedNames = loPaged.Entities.Select(c => c.Name).ToList();
+                CollectionAssert.AreEqual(expectedPaged, pagedNames, "Paged results should be correct");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging paging boundary conditions")]
+        public void Cities_GetCitiesWithPaging_PagingBoundaries()
+        {
+            var allCities = new CityData().Cities;
+            int totalCities = allCities.Count;
+
+            CityDomainContext dp1 = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp2 = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp3 = new CityDomainContext(TestURIs.Cities);
+
+            var querySkipAll = dp1.GetCitiesWithPagingQuery().Skip(totalCities);
+            var querySkipBeyond = dp2.GetCitiesWithPagingQuery().Skip(totalCities + 10);
+            var queryTakeZero = dp3.GetCitiesWithPagingQuery().Take(0);
+
+            LoadOperation<City> lo1 = dp1.Load(querySkipAll, false);
+            LoadOperation<City> lo2 = dp2.Load(querySkipBeyond, false);
+            LoadOperation<City> lo3 = dp3.Load(queryTakeZero, false);
+
+            this.EnqueueCompletion(() => lo1);
+            this.EnqueueCompletion(() => lo2);
+            this.EnqueueCompletion(() => lo3);
+
+            EnqueueCallback(() =>
+            {
+                if (lo1.Error != null)
+                    Assert.Fail("lo1.Error: " + lo1.Error.Message);
+                if (lo2.Error != null)
+                    Assert.Fail("lo2.Error: " + lo2.Error.Message);
+                if (lo3.Error != null)
+                    Assert.Fail("lo3.Error: " + lo3.Error.Message);
+
+                Assert.AreEqual(totalCities, lo1.TotalEntityCount, "TotalEntityCount should be correct when Skip equals total");
+                Assert.AreEqual(0, lo1.Entities.Count(), "Should return 0 results when Skip equals total count");
+
+                Assert.AreEqual(totalCities, lo2.TotalEntityCount, "TotalEntityCount should be correct when Skip exceeds total");
+                Assert.AreEqual(0, lo2.Entities.Count(), "Should return 0 results when Skip exceeds total count");
+
+                Assert.AreEqual(totalCities, lo3.TotalEntityCount, "TotalEntityCount should be correct with Take(0)");
+                Assert.AreEqual(0, lo3.Entities.Count(), "Should return 0 results with Take(0)");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging with combined Where, OrderBy, Skip, Take")]
+        public void Cities_GetCitiesWithPaging_CombinedQuery()
+        {
+            CityDomainContext dp = new CityDomainContext(TestURIs.Cities);
+
+            var allCities = new CityData().Cities;
+            var waCities = allCities.Where(c => c.StateName == "WA").OrderBy(c => c.Name).ToList();
+            int skip = 1;
+            int take = 3;
+
+            var query = dp.GetCitiesWithPagingQuery()
+                .Where(c => c.StateName == "WA")
+                .OrderBy(c => c.Name)
+                .Skip(skip)
+                .Take(take);
+
+            LoadOperation<City> lo = dp.Load(query, false);
+
+            this.EnqueueCompletion(() => lo);
+
+            EnqueueCallback(() =>
+            {
+                if (lo.Error != null)
+                    Assert.Fail("LoadOperation.Error: " + lo.Error.Message);
+
+                var expectedPaged = waCities.Skip(skip).Take(take).Select(c => c.Name).ToList();
+                var resultNames = lo.Entities.Select(c => c.Name).ToList();
+
+                Assert.AreEqual(allCities.Count, lo.TotalEntityCount, "TotalEntityCount should be from out parameter (full count)");
+                Assert.AreEqual(expectedPaged.Count, lo.Entities.Count(), "Should return correct number of paged results");
+                CollectionAssert.AreEqual(expectedPaged, resultNames, "Results should be filtered, sorted, and paged correctly");
+                Assert.IsTrue(lo.Entities.All(c => c.StateName == "WA"), "All results should be filtered to WA state");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        [TestMethod]
+        [Asynchronous]
+        [Description("Test GetCitiesWithPaging TotalCount correctness across multiple pages")]
+        public void Cities_GetCitiesWithPaging_TotalCountConsistency()
+        {
+            CityDomainContext dp1 = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp2 = new CityDomainContext(TestURIs.Cities);
+            CityDomainContext dp3 = new CityDomainContext(TestURIs.Cities);
+
+            var query1 = dp1.GetCitiesWithPagingQuery();
+            var query2 = dp2.GetCitiesWithPagingQuery().Skip(2).Take(3);
+            var query3 = dp3.GetCitiesWithPagingQuery().Where(c => c.StateName == "WA").Skip(1).Take(2);
+
+            LoadOperation<City> lo1 = dp1.Load(query1, false);
+            LoadOperation<City> lo2 = dp2.Load(query2, false);
+            LoadOperation<City> lo3 = dp3.Load(query3, false);
+
+            this.EnqueueCompletion(() => lo1);
+            this.EnqueueCompletion(() => lo2);
+            this.EnqueueCompletion(() => lo3);
+
+            EnqueueCallback(() =>
+            {
+                if (lo1.Error != null)
+                    Assert.Fail("lo1.Error: " + lo1.Error.Message);
+                if (lo2.Error != null)
+                    Assert.Fail("lo2.Error: " + lo2.Error.Message);
+                if (lo3.Error != null)
+                    Assert.Fail("lo3.Error: " + lo3.Error.Message);
+
+                var allCities = new CityData().Cities;
+                int expectedTotalCount = allCities.Count;
+
+                Assert.AreEqual(expectedTotalCount, lo1.TotalEntityCount, "TotalCount should match for basic query");
+                Assert.AreEqual(expectedTotalCount, lo2.TotalEntityCount, "TotalCount should be consistent for paged query");
+                Assert.AreEqual(expectedTotalCount, lo3.TotalEntityCount, "TotalCount should be consistent for filtered and paged query");
+            });
+
+            EnqueueTestComplete();
+        }
+
+        #endregion
     }
 }

@@ -569,6 +569,16 @@ namespace Cities
         }
         
         /// <summary>
+        /// Gets an EntityQuery instance that can be used to load <see cref="City"/> entity instances using the 'GetCitiesWithPaging' query.
+        /// </summary>
+        /// <returns>An EntityQuery that can be loaded to retrieve <see cref="City"/> entity instances.</returns>
+        public EntityQuery<City> GetCitiesWithPagingQuery()
+        {
+            this.ValidateMethod("GetCitiesWithPagingQuery", null);
+            return base.CreateQuery<City>("GetCitiesWithPaging", null, false, true);
+        }
+        
+        /// <summary>
         /// Gets an EntityQuery instance that can be used to load <see cref="City"/> entity instances using the 'GetCitiesInState' query.
         /// </summary>
         /// <param name="state">The value for the 'state' parameter of the query.</param>
