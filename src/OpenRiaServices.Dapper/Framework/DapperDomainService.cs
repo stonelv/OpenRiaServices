@@ -168,6 +168,11 @@ namespace OpenRiaServices.Dapper
         }
 
         /// <summary>
+        /// 跟踪已处理的条目，用于补偿操作
+        /// </summary>
+        private readonly List<ProcessedEntry> _processedEntries = new List<ProcessedEntry>();
+
+        /// <summary>
         /// 执行保存更改
         /// </summary>
         /// <param name="retryOnConflict">是否在冲突后重试</param>
@@ -175,12 +180,17 @@ namespace OpenRiaServices.Dapper
         /// <returns>如果成功返回 true</returns>
         private bool InvokeSaveChanges(bool retryOnConflict, CancellationToken cancellationToken)
         {
+            _processedEntries.Clear();
+
             try
             {
                 BeginTransaction();
 
                 foreach (var entry in ChangeSet!.ChangeSetEntries)
                 {
+                    var originalEntity = entry.OriginalEntity;
+                    var operation = entry.Operation;
+
                     switch (entry.Operation)
                     {
                         case DomainOperation.Insert:
@@ -193,13 +203,15 @@ namespace OpenRiaServices.Dapper
                             ProcessDelete(entry);
                             break;
                     }
+
+                    _processedEntries.Add(new ProcessedEntry(entry.Entity, originalEntity, operation));
                 }
 
                 CommitTransaction();
             }
             catch (DBConcurrencyException ex)
             {
-                RollbackTransaction();
+                RollbackAndCompensate();
                 HandleConcurrencyException(ex);
 
                 if (retryOnConflict && ResolveConflicts())
@@ -223,11 +235,101 @@ namespace OpenRiaServices.Dapper
             }
             catch
             {
-                RollbackTransaction();
+                RollbackAndCompensate();
                 throw;
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// 回滚事务并执行补偿操作
+        /// </summary>
+        private void RollbackAndCompensate()
+        {
+            try
+            {
+                RollbackTransaction();
+            }
+            finally
+            {
+                ExecuteCompensation();
+            }
+        }
+
+        /// <summary>
+        /// 执行补偿操作，还原已处理条目的原始状态
+        /// </summary>
+        private void ExecuteCompensation()
+        {
+            foreach (var processedEntry in _processedEntries)
+            {
+                try
+                {
+                    switch (processedEntry.Operation)
+                    {
+                        case DomainOperation.Insert:
+                            CompensateInsert(processedEntry.Entity);
+                            break;
+                        case DomainOperation.Update:
+                            CompensateUpdate(processedEntry.Entity, processedEntry.OriginalEntity);
+                            break;
+                        case DomainOperation.Delete:
+                            CompensateDelete(processedEntry.Entity);
+                            break;
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        /// <summary>
+        /// 补偿插入操作：移除实体中已生成的主键值
+        /// </summary>
+        /// <param name="entity">实体</param>
+        protected virtual void CompensateInsert(object entity)
+        {
+            var metadata = EntityMetadata.GetMetadata(entity.GetType());
+            foreach (var keyProp in metadata.KeyProperties.Where(p => p.IsDatabaseGenerated))
+            {
+                if (keyProp.CanWrite)
+                {
+                    keyProp.SetValue(entity, keyProp.PropertyType.IsValueType ? Activator.CreateInstance(keyProp.PropertyType) : null);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 补偿更新操作：还原实体属性到原始值
+        /// </summary>
+        /// <param name="entity">当前实体</param>
+        /// <param name="originalEntity">原始实体</param>
+        protected virtual void CompensateUpdate(object entity, object? originalEntity)
+        {
+            if (originalEntity == null)
+            {
+                return;
+            }
+
+            var metadata = EntityMetadata.GetMetadata(entity.GetType());
+            foreach (var prop in metadata.AllProperties)
+            {
+                if (prop.CanWrite && !prop.IsKey && !prop.IsDatabaseGenerated)
+                {
+                    var originalValue = prop.GetValue(originalEntity);
+                    prop.SetValue(entity, originalValue);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 补偿删除操作：通常不需要特殊处理，因为实体已在内存中
+        /// </summary>
+        /// <param name="entity">实体</param>
+        protected virtual void CompensateDelete(object entity)
+        {
         }
 
         /// <summary>
@@ -403,6 +505,23 @@ namespace OpenRiaServices.Dapper
                 }
             }
             base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>
+    /// 用于跟踪已处理条目的内部类
+    /// </summary>
+    internal class ProcessedEntry
+    {
+        public object Entity { get; }
+        public object? OriginalEntity { get; }
+        public DomainOperation Operation { get; }
+
+        public ProcessedEntry(object entity, object? originalEntity, DomainOperation operation)
+        {
+            Entity = entity;
+            OriginalEntity = originalEntity;
+            Operation = operation;
         }
     }
 }
