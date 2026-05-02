@@ -103,6 +103,15 @@ namespace OpenRiaServices.Tools.TextTemplate
         internal IEnumerable<Attribute> GetPropertyAttributes(PropertyDescriptor propertyDescriptor, Type propertyType)
         {
             List<Attribute> propertyAttributes = propertyDescriptor.ExplicitAttributes().Cast<Attribute>().ToList();
+            
+            bool isClientVisible = true;
+            OpenRiaServices.Server.ClientVisibleAttribute clientVisibleAttr = propertyAttributes.OfType<OpenRiaServices.Server.ClientVisibleAttribute>().SingleOrDefault();
+            if (clientVisibleAttr != null)
+            {
+                isClientVisible = clientVisibleAttr.IsVisible;
+                propertyAttributes.Remove(clientVisibleAttr);
+            }
+            
             if (!propertyAttributes.OfType<DataMemberAttribute>().Any())
             {
                 propertyAttributes.Add(new DataMemberAttribute());
@@ -124,6 +133,11 @@ namespace OpenRiaServices.Tools.TextTemplate
             if (this.Type.Attributes()[typeof(RoundtripOriginalAttribute)] != null)
             {
                 propertyAttributes.RemoveAll(attr => attr.GetType() == typeof(RoundtripOriginalAttribute));
+            }
+            
+            if (isClientVisible)
+            {
+                propertyAttributes.Add(new OpenRiaServices.Client.ClientVisibleAttribute(true));
             }
 
             return propertyAttributes;

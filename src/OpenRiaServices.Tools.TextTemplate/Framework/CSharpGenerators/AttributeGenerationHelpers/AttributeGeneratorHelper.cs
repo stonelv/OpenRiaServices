@@ -51,6 +51,7 @@ namespace OpenRiaServices.Tools.TextTemplate
             { typeof(EnableClientAccessAttribute), null },
             { typeof(IncludeAttribute), null },
             { typeof(ExcludeAttribute), null },
+            { typeof(ClientVisibleAttribute), null },
             { typeof(QueryAttribute), null },
             { typeof(InvokeAttribute), null },
             { typeof(InsertAttribute), null },

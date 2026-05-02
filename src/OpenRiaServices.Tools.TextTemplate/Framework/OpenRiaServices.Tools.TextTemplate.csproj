@@ -20,6 +20,8 @@
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\DomainIdentifierAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\DomainIdentifierAttributeBuilder.cs" />
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\EditableAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\EditableAttributeBuilder.cs" />
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\EntityAssociationAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\EntityAssociationAttributeBuilder.cs" />
+    <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\ClientVisibleAttribute.cs" Link="CSharpGenerators\AttributeGenerationHelpers\ClientVisibleAttribute.cs" />
+    <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\ClientVisibleAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\ClientVisibleAttributeBuilder.cs" />
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\ICustomAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\ICustomAttributeBuilder.cs" />
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\RangeCustomAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\RangeCustomAttributeBuilder.cs" />
     <Compile Include="..\..\OpenRiaServices.Tools\Framework\MetadataPipeline\StandardCustomAttributeBuilder.cs" Link="CSharpGenerators\AttributeGenerationHelpers\StandardCustomAttributeBuilder.cs" />
