@@ -110,50 +110,8 @@ namespace OpenRiaServices.Client.Auditing
         }
 
         /// <summary>
-        /// 提交所有挂起的更改到 DomainService
-        /// </summary>
-        public new SubmitOperation SubmitChanges()
-        {
-            return this.SubmitChanges(null, null);
-        }
-
-        /// <summary>
-        /// 提交所有挂起的更改到 DomainService
-        /// </summary>
-        public new virtual SubmitOperation SubmitChanges(Action<SubmitOperation>? callback, object? userState)
-        {
-            if (IsAuditingEnabled && this.HasChanges)
-            {
-                var changeSet = this.EntityContainer.GetChanges();
-                GenerateAndPublishAuditLog(changeSet);
-            }
-            return base.SubmitChanges(callback, userState);
-        }
-
-        /// <summary>
-        /// 异步提交所有挂起的更改到 DomainService
-        /// </summary>
-        public new Task<SubmitResult> SubmitChangesAsync()
-        {
-            return SubmitChangesAsync(CancellationToken.None);
-        }
-
-        /// <summary>
-        /// 异步提交所有挂起的更改到 DomainService
-        /// </summary>
-        public new Task<SubmitResult> SubmitChangesAsync(CancellationToken cancellationToken)
-        {
-            if (IsAuditingEnabled && this.HasChanges)
-            {
-                var changeSet = this.EntityContainer.GetChanges();
-                GenerateAndPublishAuditLog(changeSet);
-            }
-            return base.SubmitChangesAsync(cancellationToken);
-        }
-
-        /// <summary>
         /// 提交指定的挂起更改到 DomainService
-        /// 可重写此方法以实现自定义的扩展逻辑
+        /// 所有 SubmitChanges 重载最终都会调用此方法，这是扩展的核心点
         /// </summary>
         protected override Task<SubmitResult> SubmitChangesAsync(EntityChangeSet changeSet, CancellationToken cancellationToken)
         {
