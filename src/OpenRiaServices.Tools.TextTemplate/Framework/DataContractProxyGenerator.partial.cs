@@ -104,7 +104,7 @@ namespace OpenRiaServices.Tools.TextTemplate
         {
             List<Attribute> propertyAttributes = propertyDescriptor.ExplicitAttributes().Cast<Attribute>().ToList();
             
-            bool isClientVisible = true;
+            bool? isClientVisible = null;
             OpenRiaServices.Server.ClientVisibleAttribute clientVisibleAttr = propertyAttributes.OfType<OpenRiaServices.Server.ClientVisibleAttribute>().SingleOrDefault();
             if (clientVisibleAttr != null)
             {
@@ -135,7 +135,7 @@ namespace OpenRiaServices.Tools.TextTemplate
                 propertyAttributes.RemoveAll(attr => attr.GetType() == typeof(RoundtripOriginalAttribute));
             }
             
-            if (isClientVisible)
+            if (isClientVisible == true)
             {
                 propertyAttributes.Add(new OpenRiaServices.Client.ClientVisibleAttribute(true));
             }

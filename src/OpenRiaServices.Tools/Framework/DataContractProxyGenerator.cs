@@ -387,6 +387,14 @@ namespace OpenRiaServices.Tools
             property.Attributes = MemberAttributes.Public | MemberAttributes.Final; // final needed, else becomes virtual
             var propertyAttributes = propertyDescriptor.ExplicitAttributes().Cast<Attribute>().ToList(); //Do not use attributes only used by the compiler
 
+            bool? isClientVisible = null;
+            OpenRiaServices.Server.ClientVisibleAttribute clientVisibleAttr = propertyAttributes.OfType<OpenRiaServices.Server.ClientVisibleAttribute>().SingleOrDefault();
+            if (clientVisibleAttr != null)
+            {
+                isClientVisible = clientVisibleAttr.IsVisible;
+                propertyAttributes.Remove(clientVisibleAttr);
+            }
+
             // Generate <summary> for property
             string comment = string.Format(CultureInfo.CurrentCulture, Resource.CodeGen_Entity_Property_Summary_Comment, propertyName);
             property.Comments.AddRange(CodeGenUtilities.GenerateSummaryCodeComment(comment, this.ClientProxyGenerator.IsCSharp));
@@ -400,6 +408,16 @@ namespace OpenRiaServices.Tools
             {
                 CodeAttributeDeclaration dataMemberAtt = CodeGenUtilities.CreateAttributeDeclaration(typeof(DataMemberAttribute), this.ClientProxyGenerator, this.ProxyClass);
                 property.CustomAttributes.Add(dataMemberAtt);
+            }
+
+            // ----------------------------------------------------------------
+            // [ClientVisible] -> Add only if explicitly marked with [ClientVisible(true)]
+            // ----------------------------------------------------------------
+            if (isClientVisible == true)
+            {
+                CodeAttributeDeclaration clientVisibleAtt = CodeGenUtilities.CreateAttributeDeclaration(typeof(OpenRiaServices.Client.ClientVisibleAttribute), this.ClientProxyGenerator, this.ProxyClass);
+                clientVisibleAtt.Arguments.Add(new CodeAttributeArgument(new CodePrimitiveExpression(true)));
+                property.CustomAttributes.Add(clientVisibleAtt);
             }
 
             // Here, we check for the existence of [ReadOnly(true)] attributes generated when
