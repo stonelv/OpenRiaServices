@@ -22,6 +22,11 @@ namespace OpenRiaServices.Dapper
     {
         private readonly ConcurrentDictionary<Type, SqlGenerator> _generatorCache = new ConcurrentDictionary<Type, SqlGenerator>();
 
+        /// <summary>
+        /// 是否使用 OUTPUT 子句获取自增 ID（默认 true，比 SCOPE_IDENTITY() 更可靠）
+        /// </summary>
+        protected bool UseOutputClauseForIdentity { get; set; } = true;
+
         protected AutoDapperDomainService(string connectionString)
             : base(connectionString)
         {
@@ -45,33 +50,190 @@ namespace OpenRiaServices.Dapper
         protected override void InsertEntity(object entity)
         {
             var generator = GetSqlGenerator(entity.GetType());
-            var statement = generator.GenerateInsert(entity);
             var metadata = EntityMetadata.GetMetadata(entity.GetType());
-
-            if (metadata.DatabaseGeneratedProperties.Any(p => p.IsKey))
+            
+            SqlStatement statement;
+            if (UseOutputClauseForIdentity && metadata.DatabaseGeneratedProperties.Any(p => p.IsKey))
             {
-                var result = Connection.QueryFirstOrDefault<dynamic>(
-                    statement.Sql,
-                    statement.Parameters.Parameters,
-                    transaction: Transaction);
+                statement = generator.GenerateInsertWithOutput(entity);
+            }
+            else
+            {
+                statement = generator.GenerateInsert(entity);
+            }
 
-                if (result != null)
+            if (statement.IdentityInfo.HasIdentityColumn)
+            {
+                object? identityValue;
+                
+                if (UseOutputClauseForIdentity && statement.IdentityInfo.UseOutputParameter)
                 {
-                    var identityValue = GetIdentityValue(result);
-                    if (identityValue != null)
-                    {
-                        var keyProp = metadata.KeyProperties.First(p => p.IsDatabaseGenerated);
-                        SetIdentityValue(entity, keyProp, identityValue);
-                    }
+                    identityValue = Connection.ExecuteScalar<object>(
+                        statement.Sql,
+                        statement.Parameters,
+                        transaction: Transaction);
+                }
+                else
+                {
+                    var result = Connection.QueryFirstOrDefault<dynamic>(
+                        statement.Sql,
+                        statement.Parameters,
+                        transaction: Transaction);
+                    
+                    identityValue = GetIdentityValue(result, statement.IdentityInfo);
+                }
+
+                if (identityValue != null && identityValue != DBNull.Value)
+                {
+                    var keyProp = metadata.KeyProperties.First(p => p.IsDatabaseGenerated);
+                    SetIdentityValue(entity, keyProp, identityValue);
                 }
             }
             else
             {
                 Connection.Execute(
                     statement.Sql,
-                    statement.Parameters.Parameters,
+                    statement.Parameters,
                     transaction: Transaction);
             }
+        }
+
+        /// <summary>
+        /// 获取自增 ID 值
+        /// </summary>
+        /// <param name="result">查询结果（dynamic 对象）</param>
+        /// <param name="identityInfo">自增列信息</param>
+        /// <returns>自增 ID 值</returns>
+        protected virtual object? GetIdentityValue(dynamic result, IdentityColumnInfo identityInfo)
+        {
+            if (result == null)
+            {
+                return null;
+            }
+
+            if (result is IDictionary<string, object> dict)
+            {
+                if (dict.TryGetValue("IdentityValue", out var value))
+                {
+                    return value;
+                }
+                
+                if (identityInfo.ColumnName != null && dict.TryGetValue(identityInfo.ColumnName, out value))
+                {
+                    return value;
+                }
+                
+                if (identityInfo.PropertyName != null && dict.TryGetValue(identityInfo.PropertyName, out value))
+                {
+                    return value;
+                }
+                
+                if (dict.Count > 0)
+                {
+                    return dict.Values.First();
+                }
+            }
+
+            try
+            {
+                var type = result.GetType();
+                
+                if (identityInfo.PropertyName != null)
+                {
+                    var prop = type.GetProperty(identityInfo.PropertyName, BindingFlags.Public | BindingFlags.Instance);
+                    if (prop != null)
+                    {
+                        return prop.GetValue(result);
+                    }
+                }
+                
+                if (identityInfo.ColumnName != null)
+                {
+                    var prop = type.GetProperty(identityInfo.ColumnName, BindingFlags.Public | BindingFlags.Instance);
+                    if (prop != null)
+                    {
+                        return prop.GetValue(result);
+                    }
+                }
+
+                var identityProp = type.GetProperty("IdentityValue", BindingFlags.Public | BindingFlags.Instance);
+                if (identityProp != null)
+                {
+                    return identityProp.GetValue(result);
+                }
+                
+                var idProp = type.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance);
+                if (idProp != null)
+                {
+                    return idProp.GetValue(result);
+                }
+                
+                var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                if (props.Length > 0)
+                {
+                    return props[0].GetValue(result);
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 设置自增 ID 值到实体
+        /// </summary>
+        /// <param name="entity">实体对象</param>
+        /// <param name="keyProp">主键属性元数据</param>
+        /// <param name="identityValue">自增 ID 值</param>
+        protected virtual void SetIdentityValue(object entity, PropertyMetadata keyProp, object identityValue)
+        {
+            if (identityValue == null || identityValue == DBNull.Value)
+            {
+                return;
+            }
+
+            var targetType = Nullable.GetUnderlyingType(keyProp.PropertyType) ?? keyProp.PropertyType;
+            
+            if (identityValue.GetType() == targetType)
+            {
+                keyProp.SetValue(entity, identityValue);
+                return;
+            }
+
+            if (identityValue is IConvertible convertible)
+            {
+                try
+                {
+                    var convertedValue = Convert.ChangeType(convertible, targetType);
+                    keyProp.SetValue(entity, convertedValue);
+                    return;
+                }
+                catch (InvalidCastException)
+                {
+                }
+            }
+
+            if (targetType == typeof(int) || targetType == typeof(int?))
+            {
+                if (decimal.TryParse(identityValue.ToString(), out var decValue))
+                {
+                    keyProp.SetValue(entity, (int)decValue);
+                    return;
+                }
+            }
+
+            if (targetType == typeof(long) || targetType == typeof(long?))
+            {
+                if (decimal.TryParse(identityValue.ToString(), out var decValue))
+                {
+                    keyProp.SetValue(entity, (long)decValue);
+                    return;
+                }
+            }
+
+            keyProp.SetValue(entity, identityValue);
         }
 
         /// <summary>
@@ -89,7 +251,7 @@ namespace OpenRiaServices.Dapper
 
             var rowsAffected = Connection.Execute(
                 statement.Sql,
-                statement.Parameters.Parameters,
+                statement.Parameters,
                 transaction: Transaction);
 
             if (rowsAffected == 0)
@@ -112,7 +274,7 @@ namespace OpenRiaServices.Dapper
 
             var rowsAffected = Connection.Execute(
                 statement.Sql,
-                statement.Parameters.Parameters,
+                statement.Parameters,
                 transaction: Transaction);
 
             if (rowsAffected == 0)
@@ -144,39 +306,6 @@ namespace OpenRiaServices.Dapper
             table.AcceptChanges();
 
             return new DBConcurrencyException("Concurrency conflict detected.", null, new DataRow[] { row });
-        }
-
-        /// <summary>
-        /// 获取自增 ID 值
-        /// </summary>
-        private object? GetIdentityValue(dynamic result)
-        {
-            if (result is IDictionary<string, object> dict)
-            {
-                if (dict.TryGetValue("Id", out var value))
-                {
-                    return value;
-                }
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// 设置自增 ID 值到实体
-        /// </summary>
-        private void SetIdentityValue(object entity, PropertyMetadata keyProp, object identityValue)
-        {
-            var targetType = Nullable.GetUnderlyingType(keyProp.PropertyType) ?? keyProp.PropertyType;
-            
-            if (identityValue is IConvertible convertible)
-            {
-                var convertedValue = Convert.ChangeType(convertible, targetType);
-                keyProp.SetValue(entity, convertedValue);
-            }
-            else
-            {
-                keyProp.SetValue(entity, identityValue);
-            }
         }
 
         #region 查询辅助方法
@@ -247,6 +376,23 @@ namespace OpenRiaServices.Dapper
         protected Task<int> ExecuteAsync(string sql, object? param = null, CancellationToken cancellationToken = default)
         {
             return Connection.ExecuteAsync(sql, param, transaction: Transaction);
+        }
+
+        /// <summary>
+        /// 使用 Dapper DynamicParameters 执行查询
+        /// </summary>
+        protected IEnumerable<TEntity> QueryWithDynamicParams<TEntity>(string sql, DynamicParameters parameters)
+            where TEntity : class
+        {
+            return Connection.Query<TEntity>(sql, parameters, transaction: Transaction);
+        }
+
+        /// <summary>
+        /// 使用 Dapper DynamicParameters 执行命令
+        /// </summary>
+        protected int ExecuteWithDynamicParams(string sql, DynamicParameters parameters)
+        {
+            return Connection.Execute(sql, parameters, transaction: Transaction);
         }
 
         #endregion

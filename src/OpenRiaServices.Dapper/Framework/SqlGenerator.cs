@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using Dapper;
 
 namespace OpenRiaServices.Dapper
 {
@@ -18,7 +21,7 @@ namespace OpenRiaServices.Dapper
         }
 
         /// <summary>
-        /// 生成 INSERT 语句
+        /// 生成 INSERT 语句（使用传统的 SCOPE_IDENTITY() 方式）
         /// </summary>
         public SqlStatement GenerateInsert(object entity)
         {
@@ -48,12 +51,73 @@ namespace OpenRiaServices.Dapper
             sql.AppendLine($"({string.Join(", ", insertColumns)})");
             sql.AppendLine($"VALUES ({string.Join(", ", insertParams)})");
 
-            if (_metadata.DatabaseGeneratedProperties.Any(p => p.IsKey))
+            var identityInfo = new IdentityColumnInfo();
+            var identityKeyProp = _metadata.KeyProperties.FirstOrDefault(p => p.IsDatabaseGenerated);
+            
+            if (identityKeyProp != null)
             {
-                sql.AppendLine(";SELECT SCOPE_IDENTITY() AS Id");
+                identityInfo.HasIdentityColumn = true;
+                identityInfo.ColumnName = identityKeyProp.ColumnName;
+                identityInfo.PropertyName = identityKeyProp.PropertyName;
+                identityInfo.PropertyType = identityKeyProp.PropertyType;
+                sql.AppendLine(";SELECT CAST(SCOPE_IDENTITY() AS DECIMAL(18,0)) AS IdentityValue");
             }
 
-            return new SqlStatement(sql.ToString(), parameters);
+            return new SqlStatement(sql.ToString(), parameters, identityInfo);
+        }
+
+        /// <summary>
+        /// 生成 INSERT 语句（使用 OUTPUT 参数方式）
+        /// </summary>
+        public SqlStatement GenerateInsertWithOutput(object entity)
+        {
+            var insertColumns = new List<string>();
+            var insertParams = new List<string>();
+            var parameters = new DynamicParameters();
+            var identityInfo = new IdentityColumnInfo();
+
+            var identityKeyProp = _metadata.KeyProperties.FirstOrDefault(p => p.IsDatabaseGenerated);
+
+            foreach (var prop in _metadata.KeyProperties)
+            {
+                if (!prop.IsDatabaseGenerated)
+                {
+                    insertColumns.Add($"[{prop.ColumnName}]");
+                    insertParams.Add($"@{prop.PropertyName}");
+                    parameters.Add(prop.PropertyName, prop.GetValue(entity));
+                }
+            }
+
+            foreach (var prop in _metadata.WritableProperties)
+            {
+                insertColumns.Add($"[{prop.ColumnName}]");
+                insertParams.Add($"@{prop.PropertyName}");
+                parameters.Add(prop.PropertyName, prop.GetValue(entity));
+            }
+
+            var sql = new StringBuilder();
+            
+            if (identityKeyProp != null)
+            {
+                identityInfo.HasIdentityColumn = true;
+                identityInfo.ColumnName = identityKeyProp.ColumnName;
+                identityInfo.PropertyName = identityKeyProp.PropertyName;
+                identityInfo.PropertyType = identityKeyProp.PropertyType;
+                identityInfo.UseOutputParameter = true;
+
+                sql.AppendLine($"INSERT INTO {_metadata.TableName}");
+                sql.AppendLine($"({string.Join(", ", insertColumns)})");
+                sql.AppendLine($"OUTPUT INSERTED.[{identityKeyProp.ColumnName}]");
+                sql.AppendLine($"VALUES ({string.Join(", ", insertParams)})");
+            }
+            else
+            {
+                sql.AppendLine($"INSERT INTO {_metadata.TableName}");
+                sql.AppendLine($"({string.Join(", ", insertColumns)})");
+                sql.AppendLine($"VALUES ({string.Join(", ", insertParams)})");
+            }
+
+            return new SqlStatement(sql.ToString(), parameters, identityInfo);
         }
 
         /// <summary>
@@ -87,7 +151,7 @@ namespace OpenRiaServices.Dapper
             sql.AppendLine($"SET {string.Join(", ", setClauses)}");
             sql.AppendLine($"WHERE {string.Join(" AND ", whereClauses)}");
 
-            return new SqlStatement(sql.ToString(), parameters);
+            return new SqlStatement(sql.ToString(), parameters, IdentityColumnInfo.None);
         }
 
         /// <summary>
@@ -139,7 +203,7 @@ namespace OpenRiaServices.Dapper
             sql.AppendLine($"SET {string.Join(", ", setClauses)}");
             sql.AppendLine($"WHERE {string.Join(" AND ", whereClauses)}");
 
-            return new SqlStatement(sql.ToString(), parameters);
+            return new SqlStatement(sql.ToString(), parameters, IdentityColumnInfo.None);
         }
 
         /// <summary>
@@ -165,7 +229,7 @@ namespace OpenRiaServices.Dapper
 
             var sql = $"DELETE FROM {_metadata.TableName} WHERE {string.Join(" AND ", whereClauses)}";
 
-            return new SqlStatement(sql, parameters);
+            return new SqlStatement(sql, parameters, IdentityColumnInfo.None);
         }
 
         /// <summary>
@@ -176,15 +240,28 @@ namespace OpenRiaServices.Dapper
             var whereClauses = new List<string>();
             var parameters = new DynamicParameters();
 
-            foreach (var keyProp in _metadata.KeyProperties)
+            if (keyValues is IDictionary<string, object?> dict)
             {
-                whereClauses.Add($"[{keyProp.ColumnName}] = @{keyProp.PropertyName}");
+                foreach (var kvp in dict)
+                {
+                    whereClauses.Add($"[{kvp.Key}] = @{kvp.Key}");
+                    parameters.Add(kvp.Key, kvp.Value);
+                }
+            }
+            else
+            {
+                var props = keyValues.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                foreach (var prop in props)
+                {
+                    whereClauses.Add($"[{prop.Name}] = @{prop.Name}");
+                    parameters.Add(prop.Name, prop.GetValue(keyValues));
+                }
             }
 
             var columns = string.Join(", ", _metadata.AllProperties.Select(p => $"[{p.ColumnName}]"));
             var sql = $"SELECT {columns} FROM {_metadata.TableName} WHERE {string.Join(" AND ", whereClauses)}";
 
-            return new SqlStatement(sql, parameters);
+            return new SqlStatement(sql, parameters, IdentityColumnInfo.None);
         }
 
         /// <summary>
@@ -194,7 +271,7 @@ namespace OpenRiaServices.Dapper
         {
             var columns = string.Join(", ", _metadata.AllProperties.Select(p => $"[{p.ColumnName}]"));
             var sql = $"SELECT {columns} FROM {_metadata.TableName}";
-            return new SqlStatement(sql, DynamicParameters.Empty);
+            return new SqlStatement(sql, new DynamicParameters(), IdentityColumnInfo.None);
         }
     }
 
@@ -203,68 +280,33 @@ namespace OpenRiaServices.Dapper
     /// </summary>
     public class SqlStatement
     {
-        public static readonly SqlStatement Empty = new SqlStatement(string.Empty, DynamicParameters.Empty);
+        public static readonly SqlStatement Empty = new SqlStatement(string.Empty, new DynamicParameters(), IdentityColumnInfo.None);
 
         public string Sql { get; }
         public DynamicParameters Parameters { get; }
+        public IdentityColumnInfo IdentityInfo { get; }
 
         public bool IsEmpty => string.IsNullOrEmpty(Sql);
 
-        public SqlStatement(string sql, DynamicParameters parameters)
+        public SqlStatement(string sql, DynamicParameters parameters, IdentityColumnInfo identityInfo)
         {
             Sql = sql;
             Parameters = parameters;
+            IdentityInfo = identityInfo;
         }
     }
 
     /// <summary>
-    /// 动态参数集合
+    /// 自增列信息
     /// </summary>
-    public class DynamicParameters
+    public class IdentityColumnInfo
     {
-        public static readonly DynamicParameters Empty = new DynamicParameters();
+        public static readonly IdentityColumnInfo None = new IdentityColumnInfo();
 
-        private readonly Dictionary<string, object?> _parameters = new Dictionary<string, object?>();
-
-        public IReadOnlyDictionary<string, object?> Parameters => _parameters;
-
-        public DynamicParameters()
-        {
-        }
-
-        public DynamicParameters(object obj)
-        {
-            if (obj != null)
-            {
-                var props = obj.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                foreach (var prop in props)
-                {
-                    _parameters[prop.Name] = prop.GetValue(obj);
-                }
-            }
-        }
-
-        public void Add(string name, object? value)
-        {
-            _parameters[name] = value ?? DBNull.Value;
-        }
-
-        public T? Get<T>(string name)
-        {
-            if (_parameters.TryGetValue(name, out var value))
-            {
-                if (value == null || value == DBNull.Value)
-                {
-                    return default;
-                }
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            return default;
-        }
-
-        public object? ToDynamicParameters()
-        {
-            return this;
-        }
+        public bool HasIdentityColumn { get; set; }
+        public string? ColumnName { get; set; }
+        public string? PropertyName { get; set; }
+        public Type? PropertyType { get; set; }
+        public bool UseOutputParameter { get; set; }
     }
 }
