@@ -51,83 +51,133 @@ namespace OpenRiaServices.Client.Auditing
         {
             WriteStartObject(writer, writeIndented, indentLevel);
 
+            bool hasPrevious = false;
+
             // LogId
-            WriteProperty(writer, "logId", auditLog.LogId.ToString(), writeIndented, indentLevel + 1, isLast: false);
+            WriteStringProperty(writer, "logId", auditLog.LogId.ToString(), writeIndented, indentLevel + 1, ref hasPrevious);
 
             // Timestamp
-            WriteProperty(writer, "timestamp", auditLog.Timestamp.ToString("o"), writeIndented, indentLevel + 1, isLast: false);
+            WriteStringProperty(writer, "timestamp", auditLog.Timestamp.ToString("o"), writeIndented, indentLevel + 1, ref hasPrevious);
 
-            // OperationDescription
+            // OperationDescription (可选)
             if (!string.IsNullOrEmpty(auditLog.OperationDescription))
             {
-                WriteProperty(writer, "operationDescription", auditLog.OperationDescription, writeIndented, indentLevel + 1, isLast: false);
+                WriteStringProperty(writer, "operationDescription", auditLog.OperationDescription, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
-            // UserName
+            // UserName (可选)
             if (!string.IsNullOrEmpty(auditLog.UserName))
             {
-                WriteProperty(writer, "userName", auditLog.UserName, writeIndented, indentLevel + 1, isLast: false);
+                WriteStringProperty(writer, "userName", auditLog.UserName, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
             // Counts
-            WriteProperty(writer, "addedCount", auditLog.AddedCount, writeIndented, indentLevel + 1, isLast: false);
-            WriteProperty(writer, "modifiedCount", auditLog.ModifiedCount, writeIndented, indentLevel + 1, isLast: false);
-            WriteProperty(writer, "removedCount", auditLog.RemovedCount, writeIndented, indentLevel + 1, isLast: false);
-            WriteProperty(writer, "totalChanges", auditLog.TotalChanges, writeIndented, indentLevel + 1, isLast: false);
+            WriteIntProperty(writer, "addedCount", auditLog.AddedCount, writeIndented, indentLevel + 1, ref hasPrevious);
+            WriteIntProperty(writer, "modifiedCount", auditLog.ModifiedCount, writeIndented, indentLevel + 1, ref hasPrevious);
+            WriteIntProperty(writer, "removedCount", auditLog.RemovedCount, writeIndented, indentLevel + 1, ref hasPrevious);
+            WriteIntProperty(writer, "totalChanges", auditLog.TotalChanges, writeIndented, indentLevel + 1, ref hasPrevious);
 
             // EntityChanges
-            WriteEntityChangesArray(writer, auditLog.EntityChanges, writeIndented, indentLevel + 1, isLast: false);
+            WriteEntityChangesArray(writer, auditLog.EntityChanges, writeIndented, indentLevel + 1, ref hasPrevious);
 
-            // CustomData
+            // CustomData (可选)
             if (auditLog.CustomData != null && auditLog.CustomData.Count > 0)
             {
-                WriteDictionary(writer, "customData", auditLog.CustomData, writeIndented, indentLevel + 1, isLast: true);
-            }
-            else
-            {
-                // 如果没有 CustomData，则 entityChanges 是最后一个属性
-                // 我们需要重新处理，让 entityChanges 成为最后一个
-                // 这里简化处理：直接写一个空对象
-                WritePropertyName(writer, "customData", writeIndented, indentLevel + 1);
-                writer.Write("{}");
+                WriteDictionaryProperty(writer, "customData", auditLog.CustomData, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
+            if (writeIndented)
+                writer.WriteLine();
             WriteEndObject(writer, writeIndented, indentLevel);
         }
 
         /// <summary>
-        /// 写入实体变更数组
+        /// 写入字符串属性，带逗号控制
         /// </summary>
-        private static void WriteEntityChangesArray(StringWriter writer, List<EntityChangeEntry> entityChanges, bool writeIndented, int indentLevel, bool isLast)
+        private static void WriteStringProperty(StringWriter writer, string name, string? value, bool writeIndented, int indentLevel, ref bool hasPrevious)
         {
+            WritePropertyPrefix(writer, writeIndented, indentLevel, ref hasPrevious);
+            WritePropertyName(writer, name, writeIndented, indentLevel);
+            if (value == null)
+                writer.Write("null");
+            else
+                writer.Write($"\"{EscapeJsonString(value)}\"");
+        }
+
+        /// <summary>
+        /// 写入整数属性，带逗号控制
+        /// </summary>
+        private static void WriteIntProperty(StringWriter writer, string name, int value, bool writeIndented, int indentLevel, ref bool hasPrevious)
+        {
+            WritePropertyPrefix(writer, writeIndented, indentLevel, ref hasPrevious);
+            WritePropertyName(writer, name, writeIndented, indentLevel);
+            writer.Write(value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// 写入实体变更数组属性
+        /// </summary>
+        private static void WriteEntityChangesArray(StringWriter writer, List<EntityChangeEntry>? entityChanges, bool writeIndented, int indentLevel, ref bool hasPrevious)
+        {
+            WritePropertyPrefix(writer, writeIndented, indentLevel, ref hasPrevious);
             WritePropertyName(writer, "entityChanges", writeIndented, indentLevel);
 
             if (entityChanges == null || entityChanges.Count == 0)
             {
                 writer.Write("[]");
-                if (!isLast) writer.Write(",");
-                if (writeIndented) writer.WriteLine();
                 return;
             }
 
             WriteStartArray(writer, writeIndented, indentLevel);
 
+            bool hasItem = false;
             for (int i = 0; i < entityChanges.Count; i++)
             {
                 var entityChange = entityChanges[i];
-                bool isLastItem = i == entityChanges.Count - 1;
-
+                WriteItemPrefix(writer, writeIndented, indentLevel + 1, ref hasItem);
                 WriteEntityChangeEntry(writer, entityChange, writeIndented, indentLevel + 1);
-
-                if (!isLastItem)
-                    writer.Write(",");
-                if (writeIndented)
-                    writer.WriteLine();
             }
 
+            if (writeIndented && hasItem)
+                writer.WriteLine();
             WriteEndArray(writer, writeIndented, indentLevel);
-            if (!isLast) writer.Write(",");
-            if (writeIndented) writer.WriteLine();
+        }
+
+        /// <summary>
+        /// 写入字典属性
+        /// </summary>
+        private static void WriteDictionaryProperty(StringWriter writer, string propertyName, Dictionary<string, object?>? dictionary, bool writeIndented, int indentLevel, ref bool hasPrevious)
+        {
+            WritePropertyPrefix(writer, writeIndented, indentLevel, ref hasPrevious);
+            WritePropertyName(writer, propertyName, writeIndented, indentLevel);
+
+            if (dictionary == null || dictionary.Count == 0)
+            {
+                writer.Write("{}");
+                return;
+            }
+
+            WriteDictionaryValue(writer, dictionary, writeIndented, indentLevel);
+        }
+
+        /// <summary>
+        /// 写入字典值（不带属性名前缀）
+        /// </summary>
+        private static void WriteDictionaryValue(StringWriter writer, Dictionary<string, object?> dictionary, bool writeIndented, int indentLevel)
+        {
+            WriteStartObject(writer, writeIndented, indentLevel);
+
+            bool hasItem = false;
+            foreach (var kvp in dictionary)
+            {
+                WriteItemPrefix(writer, writeIndented, indentLevel + 1, ref hasItem);
+                WritePropertyName(writer, EscapeJsonString(kvp.Key), writeIndented, indentLevel + 1);
+                WriteValue(writer, kvp.Value);
+            }
+
+            if (writeIndented && hasItem)
+                writer.WriteLine();
+            WriteEndObject(writer, writeIndented, indentLevel);
         }
 
         /// <summary>
@@ -137,143 +187,134 @@ namespace OpenRiaServices.Client.Auditing
         {
             WriteStartObject(writer, writeIndented, indentLevel);
 
+            bool hasPrevious = false;
+
             // EntityTypeName
-            WriteProperty(writer, "entityTypeName", entry.EntityTypeName, writeIndented, indentLevel + 1, isLast: false);
+            WriteStringProperty(writer, "entityTypeName", entry.EntityTypeName, writeIndented, indentLevel + 1, ref hasPrevious);
 
             // EntityName
-            WriteProperty(writer, "entityName", entry.EntityName, writeIndented, indentLevel + 1, isLast: false);
+            WriteStringProperty(writer, "entityName", entry.EntityName, writeIndented, indentLevel + 1, ref hasPrevious);
 
             // Operation
-            WriteProperty(writer, "operation", entry.Operation.ToString(), writeIndented, indentLevel + 1, isLast: false);
+            WriteStringProperty(writer, "operation", entry.Operation.ToString(), writeIndented, indentLevel + 1, ref hasPrevious);
 
             // KeyValues
             if (entry.KeyValues != null && entry.KeyValues.Count > 0)
             {
-                WriteDictionary(writer, "keyValues", entry.KeyValues, writeIndented, indentLevel + 1, isLast: false);
+                WriteDictionaryProperty(writer, "keyValues", entry.KeyValues, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
             // PropertyChanges
             if (entry.PropertyChanges != null && entry.PropertyChanges.Count > 0)
             {
-                WritePropertyChangesArray(writer, entry.PropertyChanges, writeIndented, indentLevel + 1, isLast: false);
+                WritePropertyChangesArray(writer, entry.PropertyChanges, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
             // CurrentValues
             if (entry.CurrentValues != null && entry.CurrentValues.Count > 0)
             {
-                WriteDictionary(writer, "currentValues", entry.CurrentValues, writeIndented, indentLevel + 1, isLast: false);
+                WriteDictionaryProperty(writer, "currentValues", entry.CurrentValues, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
             // OriginalValues
             if (entry.OriginalValues != null && entry.OriginalValues.Count > 0)
             {
-                WriteDictionary(writer, "originalValues", entry.OriginalValues, writeIndented, indentLevel + 1, isLast: true);
-            }
-            else
-            {
-                // 如果没有 OriginalValues，确保最后一个属性没有逗号
-                // 这里简化处理
+                WriteDictionaryProperty(writer, "originalValues", entry.OriginalValues, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
+            if (writeIndented && hasPrevious)
+                writer.WriteLine();
             WriteEndObject(writer, writeIndented, indentLevel);
         }
 
         /// <summary>
         /// 写入属性变更数组
         /// </summary>
-        private static void WritePropertyChangesArray(StringWriter writer, List<PropertyChangeEntry> propertyChanges, bool writeIndented, int indentLevel, bool isLast)
+        private static void WritePropertyChangesArray(StringWriter writer, List<PropertyChangeEntry> propertyChanges, bool writeIndented, int indentLevel, ref bool hasPrevious)
         {
+            WritePropertyPrefix(writer, writeIndented, indentLevel, ref hasPrevious);
             WritePropertyName(writer, "propertyChanges", writeIndented, indentLevel);
 
             if (propertyChanges == null || propertyChanges.Count == 0)
             {
                 writer.Write("[]");
-                if (!isLast) writer.Write(",");
-                if (writeIndented) writer.WriteLine();
                 return;
             }
 
             WriteStartArray(writer, writeIndented, indentLevel);
 
+            bool hasItem = false;
             for (int i = 0; i < propertyChanges.Count; i++)
             {
                 var propChange = propertyChanges[i];
-                bool isLastItem = i == propertyChanges.Count - 1;
-
-                WriteStartObject(writer, writeIndented, indentLevel + 1);
-
-                WriteProperty(writer, "propertyName", propChange.PropertyName, writeIndented, indentLevel + 2, isLast: false);
-
-                // OriginalValue
-                WritePropertyName(writer, "originalValue", writeIndented, indentLevel + 2);
-                WriteValue(writer, propChange.OriginalValue);
-                writer.Write(",");
-                if (writeIndented) writer.WriteLine();
-
-                // NewValue
-                WritePropertyName(writer, "newValue", writeIndented, indentLevel + 2);
-                WriteValue(writer, propChange.NewValue);
-
-                if (!string.IsNullOrEmpty(propChange.PropertyType))
-                {
-                    writer.Write(",");
-                    if (writeIndented) writer.WriteLine();
-                    WriteProperty(writer, "propertyType", propChange.PropertyType, writeIndented, indentLevel + 2, isLast: true);
-                }
-                else
-                {
-                    if (writeIndented) writer.WriteLine();
-                }
-
-                WriteEndObject(writer, writeIndented, indentLevel + 1);
-
-                if (!isLastItem)
-                    writer.Write(",");
-                if (writeIndented)
-                    writer.WriteLine();
+                WriteItemPrefix(writer, writeIndented, indentLevel + 1, ref hasItem);
+                WritePropertyChangeEntry(writer, propChange, writeIndented, indentLevel + 1);
             }
 
+            if (writeIndented && hasItem)
+                writer.WriteLine();
             WriteEndArray(writer, writeIndented, indentLevel);
-            if (!isLast) writer.Write(",");
-            if (writeIndented) writer.WriteLine();
         }
 
         /// <summary>
-        /// 写入字典
+        /// 写入单个属性变更条目
         /// </summary>
-        private static void WriteDictionary(StringWriter writer, string propertyName, Dictionary<string, object?> dictionary, bool writeIndented, int indentLevel, bool isLast)
+        private static void WritePropertyChangeEntry(StringWriter writer, PropertyChangeEntry entry, bool writeIndented, int indentLevel)
         {
-            WritePropertyName(writer, propertyName, writeIndented, indentLevel);
-
-            if (dictionary == null || dictionary.Count == 0)
-            {
-                writer.Write("{}");
-                if (!isLast) writer.Write(",");
-                if (writeIndented) writer.WriteLine();
-                return;
-            }
-
             WriteStartObject(writer, writeIndented, indentLevel);
 
-            int i = 0;
-            foreach (var kvp in dictionary)
+            bool hasPrevious = false;
+
+            // PropertyName
+            WriteStringProperty(writer, "propertyName", entry.PropertyName, writeIndented, indentLevel + 1, ref hasPrevious);
+
+            // OriginalValue
+            WritePropertyPrefix(writer, writeIndented, indentLevel + 1, ref hasPrevious);
+            WritePropertyName(writer, "originalValue", writeIndented, indentLevel + 1);
+            WriteValue(writer, entry.OriginalValue);
+
+            // NewValue
+            WritePropertyPrefix(writer, writeIndented, indentLevel + 1, ref hasPrevious);
+            WritePropertyName(writer, "newValue", writeIndented, indentLevel + 1);
+            WriteValue(writer, entry.NewValue);
+
+            // PropertyType (可选)
+            if (!string.IsNullOrEmpty(entry.PropertyType))
             {
-                bool isLastItem = i == dictionary.Count - 1;
-
-                WritePropertyName(writer, EscapeJsonString(kvp.Key), writeIndented, indentLevel + 1);
-                WriteValue(writer, kvp.Value);
-
-                if (!isLastItem)
-                    writer.Write(",");
-                if (writeIndented)
-                    writer.WriteLine();
-
-                i++;
+                WriteStringProperty(writer, "propertyType", entry.PropertyType, writeIndented, indentLevel + 1, ref hasPrevious);
             }
 
+            if (writeIndented && hasPrevious)
+                writer.WriteLine();
             WriteEndObject(writer, writeIndented, indentLevel);
-            if (!isLast) writer.Write(",");
-            if (writeIndented) writer.WriteLine();
+        }
+
+        /// <summary>
+        /// 写入属性前缀（逗号和换行）
+        /// </summary>
+        private static void WritePropertyPrefix(StringWriter writer, bool writeIndented, int indentLevel, ref bool hasPrevious)
+        {
+            if (hasPrevious)
+            {
+                writer.Write(",");
+                if (writeIndented)
+                    writer.WriteLine();
+            }
+            hasPrevious = true;
+        }
+
+        /// <summary>
+        /// 写入数组成员前缀（逗号和换行）
+        /// </summary>
+        private static void WriteItemPrefix(StringWriter writer, bool writeIndented, int indentLevel, ref bool hasPrevious)
+        {
+            if (hasPrevious)
+            {
+                writer.Write(",");
+                if (writeIndented)
+                    writer.WriteLine();
+            }
+            hasPrevious = true;
         }
 
         /// <summary>
@@ -316,7 +357,6 @@ namespace OpenRiaServices.Client.Auditing
                     writer.Write($"\"{EscapeJsonString((string)value)}\"");
                     break;
                 default:
-                    // 对于复杂类型，尝试转换为字符串
                     if (value is Guid guid)
                     {
                         writer.Write($"\"{guid}\"");
@@ -331,7 +371,6 @@ namespace OpenRiaServices.Client.Auditing
                     }
                     else
                     {
-                        // 其他类型，转换为字符串
                         writer.Write($"\"{EscapeJsonString(value.ToString()!)}\"");
                     }
                     break;
@@ -428,29 +467,6 @@ namespace OpenRiaServices.Client.Auditing
             writer.Write($"\"{name}\":");
             if (writeIndented)
                 writer.Write(" ");
-        }
-
-        private static void WriteProperty(StringWriter writer, string name, string? value, bool writeIndented, int indentLevel, bool isLast)
-        {
-            WritePropertyName(writer, name, writeIndented, indentLevel);
-            if (value == null)
-                writer.Write("null");
-            else
-                writer.Write($"\"{EscapeJsonString(value)}\"");
-            if (!isLast)
-                writer.Write(",");
-            if (writeIndented)
-                writer.WriteLine();
-        }
-
-        private static void WriteProperty(StringWriter writer, string name, int value, bool writeIndented, int indentLevel, bool isLast)
-        {
-            WritePropertyName(writer, name, writeIndented, indentLevel);
-            writer.Write(value.ToString(CultureInfo.InvariantCulture));
-            if (!isLast)
-                writer.Write(",");
-            if (writeIndented)
-                writer.WriteLine();
         }
 
         #endregion
