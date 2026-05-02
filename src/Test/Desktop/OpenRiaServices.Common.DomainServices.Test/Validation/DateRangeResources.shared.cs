@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Resources;
@@ -10,30 +9,8 @@ namespace TestDomainServices.Validation
     {
         private static CultureInfo _resourceCulture;
         private static ResourceManager _resourceManager;
+        private static string _resourceBaseName;
         private static readonly object _lock = new object();
-
-        private static readonly Dictionary<string, Dictionary<string, string>> _resourceFallback = 
-            new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
-            {
-                { 
-                    "en", 
-                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        { "StartDateMustBeEarlierThanEndDate", "StartDate must be earlier than EndDate." },
-                        { "StartDateRequired", "StartDate is required." },
-                        { "EndDateRequired", "EndDate is required." }
-                    }
-                },
-                { 
-                    "zh", 
-                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        { "StartDateMustBeEarlierThanEndDate", "开始日期必须早于结束日期。" },
-                        { "StartDateRequired", "开始日期是必填项。" },
-                        { "EndDateRequired", "结束日期是必填项。" }
-                    }
-                }
-            };
 
         public static CultureInfo Culture
         {
@@ -70,9 +47,25 @@ namespace TestDomainServices.Validation
 
         private static string GetResourceBaseName(Assembly assembly)
         {
-            string namespacePrefix = "TestDomainServices.Validation";
-            string resourceName = "DateRangeResources";
-            return $"{namespacePrefix}.{resourceName}";
+            if (_resourceBaseName != null)
+            {
+                return _resourceBaseName;
+            }
+
+            string[] resourceNames = assembly.GetManifestResourceNames();
+            string targetSuffix = ".DateRangeResources.resources";
+
+            foreach (string name in resourceNames)
+            {
+                if (name.EndsWith(targetSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _resourceBaseName = name.Substring(0, name.Length - ".resources".Length);
+                    return _resourceBaseName;
+                }
+            }
+
+            _resourceBaseName = "TestDomainServices.Validation.DateRangeResources";
+            return _resourceBaseName;
         }
 
         private static string GetString(string key)
@@ -97,34 +90,23 @@ namespace TestDomainServices.Validation
                 }
             }
 
-            if (result == null)
+            if (result == null && !culture.Equals(CultureInfo.InvariantCulture))
             {
-                result = GetStringFromFallback(key, culture);
-            }
-
-            return result ?? key;
-        }
-
-        private static string GetStringFromFallback(string key, CultureInfo culture)
-        {
-            string language = culture.TwoLetterISOLanguageName;
-            
-            if (_resourceFallback.TryGetValue(language, out var resources) &&
-                resources.TryGetValue(key, out var value))
-            {
-                return value;
-            }
-
-            if (!string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
-            {
-                if (_resourceFallback.TryGetValue("en", out var englishResources) &&
-                    englishResources.TryGetValue(key, out var englishValue))
+                rm = ResourceManager;
+                if (rm != null)
                 {
-                    return englishValue;
+                    try
+                    {
+                        result = rm.GetString(key, CultureInfo.InvariantCulture);
+                    }
+                    catch
+                    {
+                        result = null;
+                    }
                 }
             }
 
-            return null;
+            return result ?? key;
         }
 
         public static string StartDateMustBeEarlierThanEndDate

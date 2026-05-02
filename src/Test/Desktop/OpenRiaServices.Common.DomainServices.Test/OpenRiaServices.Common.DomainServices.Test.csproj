@@ -607,6 +607,11 @@
       <LastGenOutput>Northwind_Resources.Designer.cs</LastGenOutput>
       <CustomToolNamespace>DataTests.Scenarios.LTS.Northwind_ExternalMapping</CustomToolNamespace>
     </EmbeddedResource>
+    <EmbeddedResource Update="Validation\DateRangeResources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>DateRangeResources.Designer.cs</LastGenOutput>
+      <CustomToolNamespace>TestDomainServices.Validation</CustomToolNamespace>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Baselines\**\*.cs" />
